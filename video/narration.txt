@@ -1,0 +1,1 @@
+Load a photo, or pick a starting point. DermaVTO reads the colour in L star a star b star, measures the typology angle, and ranks twenty four shades by CIEDE2000. Drag the divider to compare the raw sample with a chromophore map or a try on. Then build the YouCam request and run it live.

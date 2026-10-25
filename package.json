@@ -1,0 +1,19 @@
+{
+  "name": "dermavto",
+  "version": "1.0.0",
+  "description": "Privacy-first colorimetric skin analysis, CIEDE2000 shade matching and virtual try on studio with YouCam API compatible payloads",
+  "main": "engine.js",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/draarivpatel-ui/dermavto.git"
+  },
+  "author": "Aariv Patel (draarivpatel-ui)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "homepage": "https://aariv.me/dermavto/"
+}

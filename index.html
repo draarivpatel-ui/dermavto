@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DermaVTO | Skin tone reading and virtual try on</title>
+  <meta name="description" content="Read skin colour in CIE L*a*b*, rank 24 reference shades by CIEDE2000, preview foundation and lip colour, and build YouCam API requests. Everything runs in your browser.">
+  <meta name="theme-color" content="#faf7f2">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DermaVTO">
+  <meta property="og:title" content="DermaVTO | Skin tone reading and virtual try on">
+  <meta property="og:description" content="Colorimetric skin analysis, CIEDE2000 shade matching and a virtual try on studio with YouCam API compatible payloads. No image leaves your browser.">
+  <meta property="og:url" content="https://aariv.me/dermavto/">
+  <meta property="og:image" content="https://aariv.me/dermavto/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The DermaVTO studio showing a split view of a skin specimen with a chromophore map beside the raw colour.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="DermaVTO | Skin tone reading and virtual try on">
+  <meta name="twitter:description" content="Colorimetric skin analysis, CIEDE2000 shade matching and a virtual try on studio. No image leaves your browser.">
+  <meta name="twitter:image" content="https://aariv.me/dermavto/og.png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23faf7f2'/%3E%3Cpath d='M16 4a12 12 0 0 0 0 24z' fill='%23181514'/%3E%3Cpath d='M16 4a12 12 0 0 1 0 24z' fill='%23b84a39'/%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/cormorant-garamond.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/plus-jakarta-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body id="top">
+  <a class="skip-link" href="#studio">Skip to the studio</a>
+
+  <header class="masthead">
+    <a class="wordmark" href="#top" aria-label="DermaVTO, back to top">
+      <svg class="wordmark-mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true" focusable="false">
+        <path class="mark-ink" d="M16 4a12 12 0 0 0 0 24z"/>
+        <path class="mark-accent" d="M16 4a12 12 0 0 1 0 24z"/>
+      </svg>
+      <span>DermaVTO</span>
+    </a>
+    <nav aria-label="Primary">
+      <ul class="nav-list">
+        <li><a href="#studio">Studio</a></li>
+        <li><a href="#reading">Reading</a></li>
+        <li><a href="#shades">Shades</a></li>
+        <li><a href="#youcam">YouCam</a></li>
+        <li><a href="#method">Method</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="studio" id="studio" aria-labelledby="studio-title">
+      <div class="studio-intro">
+        <h1 id="studio-title">Match skin by measured light.</h1>
+        <p class="lede">DermaVTO reads the colour of a skin sample in CIE L*a*b*, ranks 24 reference shades by CIEDE2000, and previews the match beside the raw sample. Your photo stays in this tab, and the only thing that can leave it is a YouCam run you start yourself.</p>
+      </div>
+
+      <div class="studio-controls" id="controls">
+        <fieldset class="field-group" id="preset-group">
+          <legend>Calibrated starting points</legend>
+          <div class="preset-list" role="radiogroup" aria-label="Calibrated starting points">
+            <label class="preset"><input type="radio" name="preset" value="p1"><span class="preset-chip" data-chip="p1" aria-hidden="true"></span><span class="preset-name">Phototype I Cool Porcelain</span><span class="preset-lab" data-lab="p1">L* 78.0 a* 11.5 b* 12.5</span></label>
+            <label class="preset"><input type="radio" name="preset" value="p3" checked><span class="preset-chip" data-chip="p3" aria-hidden="true"></span><span class="preset-name">Phototype III Warm Golden</span><span class="preset-lab" data-lab="p3">L* 66.0 a* 10.0 b* 23.0</span></label>
+            <label class="preset"><input type="radio" name="preset" value="p4"><span class="preset-chip" data-chip="p4" aria-hidden="true"></span><span class="preset-name">Phototype IV Olive Neutral</span><span class="preset-lab" data-lab="p4">L* 58.0 a* 6.5 b* 20.0</span></label>
+            <label class="preset"><input type="radio" name="preset" value="p5"><span class="preset-chip" data-chip="p5" aria-hidden="true"></span><span class="preset-name">Phototype V Rich Amber</span><span class="preset-lab" data-lab="p5">L* 45.0 a* 11.0 b* 25.0</span></label>
+            <label class="preset"><input type="radio" name="preset" value="p6"><span class="preset-chip" data-chip="p6" aria-hidden="true"></span><span class="preset-name">Phototype VI Deep Espresso</span><span class="preset-lab" data-lab="p6">L* 30.0 a* 9.5 b* 15.0</span></label>
+          </div>
+          <p class="hint">Phototype names are shorthand. Fitzpatrick phototype comes from how skin reacts to sun and is not the same thing as ITA.</p>
+        </fieldset>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="hex-input">Or type a skin colour</label>
+            <div class="input-pair">
+              <input id="hex-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="7" placeholder="#C3987A" aria-describedby="hex-help">
+              <button type="button" class="btn btn-quiet" id="hex-apply">Use colour</button>
+            </div>
+            <p class="hint" id="hex-help">A hex value such as #C3987A. It is drawn as a procedural specimen at that colour.</p>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <span class="field-label" id="photo-label">Or use a photo from this device</span>
+            <label class="btn btn-quiet file-btn" for="photo-input">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M4 7a2 2 0 0 1 2-2h2l1.2-1.6A1 1 0 0 1 10 3h4a1 1 0 0 1 .8.4L16 5h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              <span>Choose a photo</span>
+            </label>
+            <input id="photo-input" class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" aria-labelledby="photo-label" aria-describedby="photo-help">
+            <p class="hint" id="photo-help">The photo is drawn to a canvas in this tab and is never uploaded. Click a cheek to sample it.</p>
+          </div>
+        </div>
+
+        <div class="field-row field-row-split">
+          <div class="field">
+            <span class="field-label" id="mode-label">Right of the divider shows</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="mode-label">
+              <label><input type="radio" name="mode" value="tryon" checked><span>Try on</span></label>
+              <label><input type="radio" name="mode" value="map"><span>Chromophore map</span></label>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label" id="sample-label">Sampling</span>
+            <button type="button" class="btn btn-quiet" id="sample-toggle" aria-pressed="false" aria-describedby="sample-help">Pick a skin patch</button>
+          </div>
+        </div>
+        <p class="hint" id="sample-help">With the picker on, click or touch the image, or focus it and use the arrow keys, to move the sampled patch.</p>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="coverage">Foundation coverage <output id="coverage-out" for="coverage">60</output></label>
+            <input id="coverage" type="range" min="0" max="100" value="60">
+          </div>
+          <div class="field">
+            <label for="glow">Foundation glow <output id="glow-out" for="glow">10</output></label>
+            <input id="glow" type="range" min="0" max="100" value="10">
+          </div>
+          <div class="field">
+            <label for="lip-finish">Lip finish</label>
+            <select id="lip-finish">
+              <option value="matte">Matte</option>
+              <option value="satin" selected>Satin</option>
+              <option value="gloss">Gloss</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="lip-intensity">Lip intensity <output id="lip-intensity-out" for="lip-intensity">85</output></label>
+            <input id="lip-intensity" type="range" min="0" max="100" value="85">
+          </div>
+        </div>
+      </div>
+
+      <figure class="stage" id="stage" style="--split: 50%">
+        <div class="stage-frame" id="stage-frame">
+          <canvas id="canvas-raw" width="640" height="800" aria-hidden="true"></canvas>
+          <canvas id="canvas-result" width="640" height="800" aria-hidden="true"></canvas>
+          <span class="stage-tag stage-tag-left" id="tag-left">Raw sample</span>
+          <span class="stage-tag stage-tag-right" id="tag-right">Try on</span>
+          <div class="stage-handle" aria-hidden="true">
+            <span class="stage-grip">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M9 6l-5 6 5 6M15 6l5 6-5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </div>
+          <div class="stage-ring" id="stage-ring" hidden></div>
+          <label class="visually-hidden" for="split">Divider position. Raw sample on the left, result on the right.</label>
+          <input class="stage-range" id="split" type="range" min="0" max="100" value="50" step="1">
+          <div class="stage-picker" id="stage-picker" hidden tabindex="0" role="application" aria-label="Skin patch picker. Arrow keys move the sampled patch. Enter reads it again."></div>
+        </div>
+        <figcaption id="stage-caption">A procedural skin specimen. It is a colour and texture study, not a picture of a person.</figcaption>
+      </figure>
+    </section>
+
+    <p class="status" id="status" role="status" aria-live="polite">Loading the first sample.</p>
+
+    <noscript>
+      <section class="noscript-panel" aria-labelledby="noscript-title">
+        <h2 id="noscript-title">This studio needs JavaScript</h2>
+        <p>DermaVTO measures colour on a canvas in your browser, so the live tools are switched off. The table shows what the engine reports for the five calibrated starting points, computed ahead of time from their L*a*b* values.</p>
+        <table class="data-table">
+          <caption>Calibrated starting points and their reading</caption>
+          <thead><tr><th scope="col">Starting point</th><th scope="col">L*</th><th scope="col">a*</th><th scope="col">b*</th><th scope="col">ITA</th><th scope="col">Band</th><th scope="col">Undertone (heuristic)</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Phototype I Cool Porcelain</th><td>78.0</td><td>11.5</td><td>12.5</td><td>65.9</td><td>Very Light</td><td>Cool</td></tr>
+            <tr><th scope="row">Phototype III Warm Golden</th><td>66.0</td><td>10.0</td><td>23.0</td><td>34.8</td><td>Intermediate</td><td>Warm</td></tr>
+            <tr><th scope="row">Phototype IV Olive Neutral</th><td>58.0</td><td>6.5</td><td>20.0</td><td>21.8</td><td>Tan</td><td>Olive</td></tr>
+            <tr><th scope="row">Phototype V Rich Amber</th><td>45.0</td><td>11.0</td><td>25.0</td><td>-11.3</td><td>Brown</td><td>Warm</td></tr>
+            <tr><th scope="row">Phototype VI Deep Espresso</th><td>30.0</td><td>9.5</td><td>15.0</td><td>-53.1</td><td>Dark</td><td>Neutral</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </noscript>
+
+    <section class="band" id="reading" aria-labelledby="reading-title">
+      <div class="band-head">
+        <h2 id="reading-title">The reading</h2>
+        <p>Where the sample sits on the Chardon ITA curve, which way its colour leans, and the optical numbers behind both.</p>
+      </div>
+      <div class="reading-grid">
+        <figure class="plot-card" id="arc-card">
+          <div id="arc-host"></div>
+          <figcaption>Each reference foundation is a dot, the three closest are numbered, and the ring is your sample. The rays are the ITA band edges at 55, 41, 28, 10 and minus 30 degrees.</figcaption>
+        </figure>
+        <div class="reading-side">
+          <figure class="plot-card plot-card-small" id="compass-card">
+            <div id="compass-host"></div>
+            <figcaption>Undertone compass. The zones come from the ratio of a* to b* and are a heuristic of this project, not a published standard.</figcaption>
+          </figure>
+          <dl class="metrics" id="metrics" aria-label="Measured values"></dl>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="shades" aria-labelledby="shades-title">
+      <div class="band-head">
+        <h2 id="shades-title">Shade ranking</h2>
+        <p>The 24 reference swatches are plain hex colours with generic names, not any brand's products. Ranking is by CIEDE2000 distance to a target taken from your sample.</p>
+      </div>
+      <div class="shades-controls">
+        <div class="segmented" role="radiogroup" aria-label="Shade family">
+          <label><input type="radio" name="kind" value="foundation" checked><span>Foundation</span></label>
+          <label><input type="radio" name="kind" value="concealer"><span>Concealer</span></label>
+          <label><input type="radio" name="kind" value="lip"><span>Lip</span></label>
+        </div>
+        <p class="hint" id="kind-note">Foundation is compared with the sample colour directly.</p>
+      </div>
+      <ol class="ranking" id="ranking" aria-label="Shades ranked by CIEDE2000 distance"></ol>
+      <p class="hint">A distance under 1 is not noticeable, 1 to 2 shows on close inspection, 2 to 3.5 shows at a glance. These are common rules of thumb, not guarantees for any screen or any eye.</p>
+    </section>
+
+    <section class="band" id="youcam" aria-labelledby="youcam-title">
+      <div class="band-head">
+        <h2 id="youcam-title">YouCam requests and responses</h2>
+        <p>Build the exact request bodies for Perfect Corp's skin analysis and makeup try on endpoints, copy them as curl, or run them live from this page with your own API key. Nothing is sent until you press Run live.</p>
+      </div>
+
+      <div class="youcam-grid">
+        <form class="panel" id="yc-form" aria-labelledby="yc-form-title" novalidate>
+          <h3 id="yc-form-title">Request builder</h3>
+          <div class="segmented" role="radiogroup" aria-label="Endpoint">
+            <label><input type="radio" name="yc-task" value="skin-analysis" checked><span>Skin analysis</span></label>
+            <label><input type="radio" name="yc-task" value="makeup-vto"><span>Makeup try on</span></label>
+          </div>
+          <div class="field">
+            <label for="yc-src-type">Image source field</label>
+            <select id="yc-src-type">
+              <option value="src_file_url" selected>src_file_url (public https link)</option>
+              <option value="src_file_id">src_file_id (from the File API)</option>
+              <option value="upload">Upload a photo from this device</option>
+            </select>
+          </div>
+          <div class="field" id="yc-upload-field" hidden>
+            <label for="yc-upload">Photo to upload</label>
+            <input id="yc-upload" type="file" accept="image/png,image/jpeg" aria-describedby="yc-upload-help">
+            <p class="hint" id="yc-upload-help">Used only by Run live. A JPEG or PNG under 10 MB, with the short side at least 480 pixels (1080 for HD).</p>
+          </div>
+          <div class="field" id="yc-src-field">
+            <label for="yc-src">Source value</label>
+            <input id="yc-src" type="text" value="https://example.com/selfie.jpg" autocomplete="off" spellcheck="false" aria-describedby="yc-src-help">
+            <p class="hint" id="yc-src-help">Replace the example with your own public image link or file id.</p>
+          </div>
+          <div id="yc-skin-options">
+            <div class="field">
+              <span class="field-label" id="yc-tier-label">Quality tier</span>
+              <div class="segmented" role="radiogroup" aria-labelledby="yc-tier-label">
+                <label><input type="radio" name="yc-tier" value="hd" checked><span>HD</span></label>
+                <label><input type="radio" name="yc-tier" value="sd"><span>SD</span></label>
+              </div>
+              <p class="hint">HD needs a short side of at least 1080 pixels. HD and SD actions cannot be mixed.</p>
+            </div>
+            <fieldset class="field-group">
+              <legend>Concerns to score (dst_actions)</legend>
+              <div class="check-grid" id="yc-actions"></div>
+            </fieldset>
+          </div>
+          <p class="form-error" id="yc-error" role="alert"></p>
+        </form>
+
+        <div class="panel panel-code">
+          <h3 id="yc-out-title">Request body</h3>
+          <p class="mono-line" id="yc-endpoint"></p>
+          <pre class="code" tabindex="0" aria-labelledby="yc-out-title"><code id="yc-json"></code></pre>
+          <div class="btn-row">
+            <button type="button" class="btn" id="yc-copy-json">Copy JSON</button>
+            <button type="button" class="btn btn-quiet" id="yc-copy-curl">Copy curl</button>
+          </div>
+          <p class="hint" id="yc-copy-note" role="status" aria-live="polite"></p>
+          <p class="hint">Checked on 25 October 2026 against Perfect Corp's published OpenAPI files. The live paths are under /s2s/v2.0/. The 1.0 in the makeup docs is the version of the effect specification, sent as the version field.</p>
+        </div>
+      </div>
+
+      <div class="panel panel-live" id="yc-live" aria-labelledby="yc-live-title">
+        <h3 id="yc-live-title">Run live with your key</h3>
+        <p class="hint">This sends the request above from your browser straight to Perfect Corp. With a link, only the link is sent. With an upload, the photo itself is sent. Your key stays in this tab's memory, is never saved, and is never sent anywhere except Perfect Corp.</p>
+        <div class="live-grid">
+          <div class="field">
+            <label for="yc-key">YouCam API key</label>
+            <input id="yc-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="yc-key-help">
+            <p class="hint" id="yc-key-help">Paste the key from your own YouCam console.</p>
+          </div>
+          <div class="field field-check">
+            <label class="check-line" for="yc-consent"><input id="yc-consent" type="checkbox"><span>I understand this sends my image, or the link to it, to Perfect Corp's servers.</span></label>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn" id="yc-run" disabled>Run live</button>
+        </div>
+        <p class="hint" id="yc-live-status" role="status" aria-live="polite"></p>
+        <div class="live-result" id="yc-live-result"></div>
+      </div>
+
+      <div class="youcam-grid youcam-grid-lower">
+        <div class="panel">
+          <h3 id="yc-read-title">Response inspector</h3>
+          <div class="field">
+            <label for="yc-response">Paste a task response or a score_info.json</label>
+            <textarea id="yc-response" rows="9" spellcheck="false" aria-describedby="yc-response-help"></textarea>
+            <p class="hint" id="yc-response-help">Scores run from 1 to 100 and higher is better looking skin. raw_score is shown first because Perfect Corp states that ui_score is adjusted upward on purpose.</p>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn" id="yc-read">Read response</button>
+            <button type="button" class="btn btn-quiet" id="yc-sample">Load the docs sample</button>
+          </div>
+          <p class="form-error" id="yc-read-error" role="alert"></p>
+          <div id="yc-table-host"></div>
+        </div>
+
+        <div class="panel panel-receipt">
+          <h3 id="receipt-title">Routine and shade receipt</h3>
+          <p class="hint" id="receipt-source"></p>
+          <pre class="code receipt" tabindex="0" aria-labelledby="receipt-title"><code id="receipt-text"></code></pre>
+          <div class="btn-row">
+            <button type="button" class="btn" id="receipt-copy">Copy receipt</button>
+          </div>
+          <p class="hint" id="receipt-note" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-method" id="method" aria-labelledby="method-title">
+      <div class="band-head">
+        <h2 id="method-title">What this measures and where it stops</h2>
+        <p>These are colour measurements for cosmetic and educational use. They are not a clinical assessment of anyone's skin, and nothing here replaces a dermatologist.</p>
+      </div>
+      <div class="method-grid">
+        <article>
+          <h3>Individual Typology Angle</h3>
+          <p>ITA is arctan((L* minus 50) divided by b*) in degrees. The six bands follow Chardon's thresholds as tabulated by Del Bino, Duval and Bernerd (2018). ITA and Fitzpatrick phototype are different scales and should not be swapped for each other.</p>
+        </article>
+        <article>
+          <h3>Colour difference</h3>
+          <p>CIEDE2000 follows Sharma, Wu and Dalal (2005) in full, including the weighting terms and the blue rotation term. The test suite checks all 34 of their published pairs to four decimals.</p>
+        </article>
+        <article>
+          <h3>Optical indices</h3>
+          <p>The erythema and melanin numbers come from three colour channels, so they are proxies and not spectral measurements. The erythema proxy also rises with deeper tone, which is why redness coverage is reported too.</p>
+        </article>
+        <article>
+          <h3>Undertone</h3>
+          <p>No standard defines undertone. The Cool, Neutral, Warm and Olive zones are a heuristic from the ratio of a* to b*, tuned for stability, and are labelled that way everywhere.</p>
+        </article>
+        <article>
+          <h3>Try on</h3>
+          <p>Foundation moves the sampled tone toward the shade in L*a*b* while softening local variation. On a photo the foundation uses a colour window for skin, not face tracking, and lips are coloured only on the specimen.</p>
+        </article>
+        <article>
+          <h3>Privacy</h3>
+          <p>Fonts, scripts and styles all load from this site. A photo is read with the browser's file API, drawn to a canvas, and discarded when you close the tab. The one exception is a live YouCam run, which only starts when you press Run live with your own key.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="colophon">
+    <p class="colophon-line">Colour first, claims second.</p>
+    <p class="colophon-small">DermaVTO is open source under the MIT licence. Built by Aariv Patel for the YouCam API Skin AI and eCommerce VTO Hackathon. YouCam and Perfect Corp are trademarks of their owner, and this project is independent of them. <a href="https://github.com/draarivpatel-ui/dermavto">Source on GitHub</a></p>
+  </footer>
+
+  <script src="engine.js"></script>
+  <script src="render.js"></script>
+  <script src="youcam-live.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
