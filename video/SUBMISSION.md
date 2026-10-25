@@ -48,3 +48,5 @@ Load a photo, or pick a starting point. DermaVTO reads the colour in L star a st
 2. Record a demo video of 1 to 3 minutes that explains the YouCam API used and shows the studio working, then upload it to YouTube and paste the link into the form.
 3. Add screenshots from the `screenshots` folder.
 4. Confirm the repository link and the live link both open without signing in.
+
+Video: https://youtu.be/zd5VTlStd0A
