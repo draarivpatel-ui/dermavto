@@ -1348,12 +1348,30 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
   }
 
   .stage {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding-block: var(--space-2);
+    background: var(--color-paper);
+    border-bottom: var(--rule-hair) solid transparent;
   }
 
-  .stage-frame,
+  .stage[data-stuck="true"] {
+    border-bottom-color: var(--color-line-strong);
+  }
+
+  .stage[data-stuck="true"] figcaption {
+    display: none;
+  }
+
+  .stage-frame {
+    width: auto;
+    height: min(38vh, 340px);
+  }
+
   .stage figcaption {
     width: min(100%, 560px);
+    margin-inline: auto;
   }
 
   .band-head,
@@ -1375,7 +1393,8 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
     grid-template-columns: 1.5rem 2.5rem minmax(0, 1fr) auto;
     grid-template-areas:
       "num chip name act"
-      "num chip de de";
+      "num chip de de"
+      "num chip bar bar";
     row-gap: var(--space-1);
   }
 
@@ -1396,7 +1415,9 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
   }
 
   .ranking li .rank-bar {
-    display: none;
+    grid-area: bar;
+    width: 100%;
+    margin-top: var(--space-1);
   }
 
   .ranking li .btn {
@@ -1405,6 +1426,30 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
 }
 
 @media (max-width: 560px) {
+  .arc-tick,
+  .arc-axis {
+    font-size: 19px;
+  }
+
+  .arc-band {
+    font-size: 24px;
+    stroke-width: 6px;
+  }
+
+  .arc-rank,
+  .arc-ita-label {
+    font-size: 18px;
+  }
+
+  .compass-label {
+    font-size: 16px;
+  }
+
+  .compass-tick,
+  .compass-axis {
+    font-size: 14px;
+  }
+
   .masthead,
   .studio,
   .band,
@@ -1441,6 +1486,27 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
   .segmented span {
     text-align: center;
     padding-inline: var(--space-3);
+  }
+}
+
+@media (pointer: coarse), (max-width: 560px) {
+  input[type="range"]:not(.stage-range) {
+    height: 44px;
+  }
+
+  input[type="range"]:not(.stage-range)::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+    margin-top: -12px;
+  }
+
+  input[type="range"]:not(.stage-range)::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+  }
+
+  .nav-list a {
+    padding-block: var(--space-3);
   }
 }
 

@@ -779,6 +779,33 @@
     });
   }
 
+  function watchStageStick() {
+    if (typeof window.matchMedia !== 'function' || typeof window.addEventListener !== 'function') return;
+    const narrow = window.matchMedia('(max-width: 960px)');
+    let queued = false;
+    function update() {
+      queued = false;
+      const stuck = narrow.matches && els.stage.getBoundingClientRect().top <= 1 && window.scrollY > 1;
+      const was = els.stage.getAttribute('data-stuck') === 'true';
+      if (stuck === was) return;
+      if (stuck) {
+        // The caption leaves the pinned bar to save height. The margin keeps the page below from jumping up.
+        const before = els.stage.offsetHeight;
+        els.stage.setAttribute('data-stuck', 'true');
+        els.stage.style.marginBottom = Math.max(0, before - els.stage.offsetHeight) + 'px';
+      } else {
+        els.stage.removeAttribute('data-stuck');
+        els.stage.style.marginBottom = '';
+      }
+    }
+    window.addEventListener('scroll', function () {
+      if (queued) return;
+      queued = true;
+      window.requestAnimationFrame(update);
+    }, { passive: true });
+    window.addEventListener('resize', update);
+  }
+
   function init() {
     document.querySelectorAll('.preset-chip').forEach(function (chip) {
       const preset = E.PRESETS.find(function (p) {
@@ -788,6 +815,7 @@
     });
     renderActionChoices('hd', defaultActions('hd'));
     bind();
+    watchStageStick();
     loadPreset(radioValue('preset', 'p3'));
   }
 
