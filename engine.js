@@ -635,7 +635,6 @@ const SHINE_CHROMA_KEEP = 0.9;
     let sumB = 0;
     let sumR = 0;
     let sumG = 0;
-    let sumBl = 0;
     let sumChroma = 0;
 
     for (let i = 0; i < n; i += 1) {
@@ -653,7 +652,6 @@ const SHINE_CHROMA_KEEP = 0.9;
       sumB += lab[2];
       sumR += rl;
       sumG += gl;
-      sumBl += bl;
       logRG[i] = Math.log10(Math.max(rl, 1e-4) / Math.max(gl, 1e-4));
       chromaArr[i] = Math.hypot(lab[1], lab[2]);
       sumChroma += chromaArr[i];
