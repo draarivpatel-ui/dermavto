@@ -252,10 +252,6 @@
     return text;
   }
 
-  function formatLab(lab) {
-    return 'L* ' + num(lab[0]) + '  a* ' + num(lab[1]) + '  b* ' + num(lab[2]);
-  }
-
   return {
     ARC: ARC,
     COMPASS: COMPASS,
@@ -265,7 +261,6 @@
     ratioToHueAngle: ratioToHueAngle,
     renderItaArcSvg: renderItaArcSvg,
     renderUndertoneCompassSvg: renderUndertoneCompassSvg,
-    describeReading: describeReading,
-    formatLab: formatLab
+    describeReading: describeReading
   };
 });
