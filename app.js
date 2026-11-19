@@ -374,10 +374,6 @@
   /* YouCam panel                                                  */
   /* ------------------------------------------------------------ */
 
-  function currentTier() {
-    return radioValue('yc-tier', 'hd');
-  }
-
   function currentTask() {
     return radioValue('yc-task', 'skin-analysis');
   }
