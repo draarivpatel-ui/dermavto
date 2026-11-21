@@ -1211,7 +1211,16 @@ const SHINE_CHROMA_KEEP = 0.9;
     return false;
   }
 
+  // DNS names that intentionally resolve to private or loopback addresses
+  // (wildcard "rebinding" services). The check cannot resolve DNS, so these
+  // well-known domains are refused by name.
+  const REBIND_SUFFIXES = [
+    'nip.io', 'sslip.io', 'xip.io', 'nip.net', 'lvh.me', 'vcap.me',
+    'localtest.me', 'local-ip.co', 'local-ip.sh', 'localize.dev'
+  ];
+
   function isPublicHttpsUrl(url) {
+    if (typeof url !== 'string' || url.indexOf('\\') !== -1) return false;
     let u;
     try {
       u = new URL(url);
@@ -1227,9 +1236,22 @@ const SHINE_CHROMA_KEEP = 0.9;
     if (host.indexOf('.') === -1) return false;
     const badSuffix = ['.local', '.localhost', '.localdomain', '.internal', '.lan', '.corp', '.home', '.intranet', '.private', '.arpa'];
     if (host === 'localhost' || badSuffix.some(function (s) { return host.endsWith(s); })) return false;
+    if (REBIND_SUFFIXES.some(function (s) { return host === s || host.endsWith('.' + s); })) return false;
     if (/^[0-9.]+$/.test(host)) return isPrivateIpv4Host(host) === false && ipv4Parts(host) !== null ? true : false;
     if (isPrivateIpv4Host(host)) return false;
     return true;
+  }
+
+  /** Deep-copy a wire-bound value so the payload never aliases caller objects. */
+  function deepCloneJson(v, code) {
+    let out;
+    try {
+      out = JSON.parse(JSON.stringify(v));
+    } catch (e) {
+      fail(code, 'value must be JSON-serializable');
+    }
+    if (out === undefined) fail(code, 'value must be JSON-serializable');
+    return out;
   }
 
   function checkIntensity(name, value) {
@@ -1389,14 +1411,14 @@ const SHINE_CHROMA_KEEP = 0.9;
       body.format = format;
       if (o.miniserver_args !== undefined) {
         if (!o.miniserver_args || typeof o.miniserver_args !== 'object') fail('invalid_args', 'miniserver_args must be an object');
-        body.miniserver_args = o.miniserver_args;
+        body.miniserver_args = deepCloneJson(o.miniserver_args, 'invalid_args');
       }
     } else {
       if (!Array.isArray(o.effects) || o.effects.length === 0) fail('invalid_effect', 'effects must be a non-empty array');
       o.effects.forEach(validateMakeupEffect);
       if (o.version !== undefined && typeof o.version !== 'string') fail('invalid_version', 'version must be a string');
       body.version = o.version || YOUCAM.effectSpecVersion;
-      body.effects = o.effects.slice();
+      body.effects = deepCloneJson(o.effects, 'invalid_effect');
     }
 
     return {
@@ -1411,8 +1433,9 @@ const SHINE_CHROMA_KEEP = 0.9;
   function buildYouCamCurl(request) {
     const json = JSON.stringify(request.body, null, 2).replace(/'/g, "'\\''");
     const url = String(request.url).replace(/'/g, "'\\''");
+    const method = String(request.method).toUpperCase().replace(/[^A-Z]/g, '') || 'GET';
     return [
-      'curl --request ' + request.method + ' \\',
+      'curl --request ' + method + ' \\',
       "  --url '" + url + "' \\",
       "  --header 'Authorization: Bearer YOUR_API_KEY' \\",
       "  --header 'Content-Type: application/json' \\",
@@ -1462,10 +1485,11 @@ const SHINE_CHROMA_KEEP = 0.9;
     const raw = cleanScore(rawScore);
     const ui = cleanScore(uiScore);
     const score = raw !== null ? raw : ui;
+    const label = Object.prototype.hasOwnProperty.call(CONCERN_LABELS, key) ? CONCERN_LABELS[key] : key;
     return {
       action: action,
       concern: key,
-      label: CONCERN_LABELS[key] || key,
+      label: label,
       region: region || 'whole',
       hd: String(action).indexOf('hd_') === 0,
       rawScore: raw,

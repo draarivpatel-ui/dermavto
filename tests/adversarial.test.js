@@ -299,3 +299,110 @@ describe('App wiring pins', () => {
     assert.doesNotMatch(html, /role="application"/);
   });
 });
+
+// ---------- Verify-round regressions (second independent review) ----------
+
+describe('URL guard: rebinding domains and backslash confusion', () => {
+  [
+    'https://127.0.0.1.nip.io/put',
+    'https://169.254.169.254.nip.io/put',
+    'https://localtest.me/put',
+    'https://x.localtest.me/put',
+    'https://a.sslip.io/put',
+    'https://1.2.3.4.xip.io/put',
+    'https://a.lvh.me/put',
+    'https://a.vcap.me/put',
+    'https://a.local-ip.co/put',
+    'https://example.com\\@169.254.169.254/put',
+    'https://example.com\\@127.0.0.1/put',
+    'https://cdn.youcam.example\\x.evil.example/put'
+  ].forEach((u) => {
+    it('rejects ' + u, () => assert.equal(E.isPublicHttpsUrl(u), false));
+  });
+  it('still accepts a plain public https host', () => {
+    assert.equal(E.isPublicHttpsUrl('https://cdn.youcam.example/r.png'), true);
+  });
+  it('refuses a rebinding upload target end to end', async () => {
+    const fetchImpl = async () => ({ ok: true, json: async () => ({ data: { files: [{ file_id: 'f1', requests: [{ url: 'https://127.0.0.1.nip.io/put', method: 'PUT', headers: {} }] }] } }) });
+    await assert.rejects(client(fetchImpl).uploadFile(FILE), /upload address/);
+  });
+  it('rejects a rebinding result link', async () => {
+    let n = 0;
+    const stub = async () => {
+      n += 1;
+      if (n === 1) return { ok: true, json: async () => ({ data: { task_id: 't1' } }) };
+      return { ok: true, json: async () => ({ data: { task_status: 'success', results: { url: 'https://169.254.169.254.nip.io/r.png' } } }) };
+    };
+    await assert.rejects(client(stub).runMakeupVto({ src_file_url: 'https://cdn.example.org/p.jpg', effects: [E.buildFoundationEffect('#C3987A')] }), /result link/);
+  });
+});
+
+describe('pollTask bounds attempts even when pollMs is hostile', () => {
+  const running = async () => ({ ok: true, json: async () => ({ data: { task_status: 'running' } }) });
+  it('NaN pollMs falls back and still terminates', async () => {
+    await assert.rejects(client(running, { pollMs: NaN, now: () => 1000 }).pollTask('skin-analysis', 't1'), /did not finish/);
+  });
+  it('zero and negative pollMs fall back to the default', async () => {
+    await assert.rejects(client(running, { pollMs: -5, now: () => 1000 }).pollTask('skin-analysis', 't1'), /did not finish/);
+  });
+  it('sleep receives the coerced pollMs, never NaN', async () => {
+    const sleeps = [];
+    const c = client(running, { pollMs: NaN, timeoutMs: 5000, now: Date.now, sleep: (ms) => { sleeps.push(ms); return Promise.resolve(); } });
+    await assert.rejects(c.pollTask('skin-analysis', 't1'), /did not finish/);
+    assert.ok(sleeps.every((ms) => ms === 2500));
+  });
+});
+
+describe('createYouCamClient pins the API key to the YouCam domain', () => {
+  it('rejects a foreign baseUrl', () => {
+    assert.throws(() => Y.createYouCamClient({ apiKey: KEY, fetchImpl: async () => ({}), baseUrl: 'https://evil.example.com' }), /YouCam API domain/);
+    assert.throws(() => Y.createYouCamClient({ apiKey: KEY, fetchImpl: async () => ({}), baseUrl: 'https://makeupar.com.evil.example' }), /YouCam API domain/);
+    assert.throws(() => Y.createYouCamClient({ apiKey: KEY, fetchImpl: async () => ({}), baseUrl: 'not a url' }), /YouCam API domain/);
+  });
+  it('accepts the default and other makeupar.com hosts', () => {
+    assert.ok(Y.createYouCamClient({ apiKey: KEY, fetchImpl: async () => ({}) }));
+    assert.ok(Y.createYouCamClient({ apiKey: KEY, fetchImpl: async () => ({}), baseUrl: 'https://cdn.makeupar.com' }));
+  });
+});
+
+describe('buildYouCamCurl keeps the method shell-safe', () => {
+  it('strips non-letters from the method', () => {
+    const out = E.buildYouCamCurl({ method: "POST' --insecure; #", url: 'https://cdn.example.org/x', body: {} });
+    assert.match(out.split('\n')[0], /^curl --request [A-Z]+ \\$/);
+    assert.equal(out.split('\n')[0].indexOf("'"), -1);
+  });
+});
+
+describe('Normalizer output[] entries cannot mint non-string labels', () => {
+  it('prototype-named types keep string labels', () => {
+    const r = E.normalizeYouCamSkinResponse({ results: { output: [
+      { type: 'constructor', raw_score: 50 },
+      { type: 'hd___proto__', raw_score: 60 },
+      { type: 'hd_pore', raw_score: 70 }
+    ] } });
+    assert.equal(r.concerns.length, 3);
+    r.concerns.forEach((c) => assert.equal(typeof c.label, 'string'));
+    assert.equal(r.concerns[0].label, 'constructor');
+    assert.equal(r.concerns[2].label, 'Pores');
+  });
+});
+
+describe('Payloads never alias caller objects', () => {
+  it('miniserver_args is deep-copied', () => {
+    const args = { strength: 1, nested: { x: 1 } };
+    const req = E.buildYouCamTaskPayload({ task: 'skin-analysis', src_file_id: 'f1', miniserver_args: args });
+    args.strength = 99;
+    args.nested.x = 99;
+    assert.equal(req.body.miniserver_args.strength, 1);
+    assert.equal(req.body.miniserver_args.nested.x, 1);
+  });
+  it('effects are deep-copied', () => {
+    const fx = [E.buildFoundationEffect('#AABBCC')];
+    const req = E.buildYouCamTaskPayload({ task: 'makeup-vto', src_file_id: 'f1', effects: fx });
+    fx[0].palettes[0].color = '#000000';
+    assert.equal(req.body.effects[0].palettes[0].color, '#aabbcc');
+  });
+  it('non-serializable args are rejected, not sent', () => {
+    assert.throws(() => E.buildYouCamTaskPayload({ task: 'skin-analysis', src_file_id: 'f1', miniserver_args: { x: 1n } }), E.YouCamPayloadError);
+  });
+});

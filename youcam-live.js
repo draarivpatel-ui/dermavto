@@ -60,6 +60,16 @@
     );
     if (!o.apiKey || typeof o.apiKey !== 'string') throw new YouCamApiError('Enter your YouCam API key first.');
     if (!o.fetchImpl) throw new YouCamApiError('This browser cannot make network requests.');
+    // The API key is sent on every call, so baseUrl may only point at YouCam.
+    let baseHost = '';
+    try {
+      baseHost = new URL(o.baseUrl).hostname.toLowerCase();
+    } catch (err) {
+      baseHost = '';
+    }
+    if (!baseHost || !(baseHost === 'makeupar.com' || baseHost.slice(-13) === '.makeupar.com')) {
+      throw new YouCamApiError('This client only sends the API key to the YouCam API domain.');
+    }
 
     async function call(method, path, body) {
       const headers = { Authorization: 'Bearer ' + o.apiKey };
@@ -125,7 +135,8 @@
     async function pollTask(name, taskId) {
       const started = o.now();
       const timeoutMs = Number.isFinite(o.timeoutMs) && o.timeoutMs > 0 ? o.timeoutMs : 180000;
-      const maxAttempts = Math.max(5, Math.ceil(timeoutMs / Math.max(o.pollMs, 1)) + 2);
+      const pollMs = Number.isFinite(o.pollMs) && o.pollMs > 0 ? o.pollMs : 2500;
+      const maxAttempts = Math.max(5, Math.ceil(timeoutMs / pollMs) + 2);
       for (let attempt = 1;; attempt += 1) {
         const json = await call('GET', '/s2s/v2.0/task/' + name + '/' + encodeURIComponent(taskId));
         const status = json && json.data && json.data.task_status;
@@ -135,7 +146,7 @@
           throw new YouCamApiError('The task did not finish in time. Try again later.');
         }
         o.onProgress('The task is running.');
-        await o.sleep(o.pollMs);
+        await o.sleep(pollMs);
       }
     }
 
