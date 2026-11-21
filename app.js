@@ -238,9 +238,16 @@
   }
 
   function analyze(resetSelection) {
-    const patch = E.extractPatch(state.image, state.sample.x, state.sample.y, PATCH);
-    state.patch = patch;
-    state.analysis = E.analyzeSkinPatch(patch);
+    let analysis;
+    try {
+      state.patch = E.extractPatch(state.image, state.sample.x, state.sample.y, PATCH);
+      analysis = E.analyzeSkinPatch(state.patch);
+    } catch (err) {
+      state.analysis = null;
+      say('The sampled region has no readable pixels. Move the marker onto skin.');
+      return;
+    }
+    state.analysis = analysis;
     ['foundation', 'concealer', 'lip'].forEach(function (kind) {
       state.ranking[kind] = E.rankShades(state.analysis.lab, kind);
       if (resetSelection || !state.selected[kind]) state.selected[kind] = state.ranking[kind][0].swatch.id;
@@ -816,6 +823,7 @@
     renderActionChoices('hd', defaultActions('hd'));
     bind();
     watchStageStick();
+    els.stage.style.setProperty('--split', els.split.value + '%');
     loadPreset(radioValue('preset', 'p3'));
   }
 

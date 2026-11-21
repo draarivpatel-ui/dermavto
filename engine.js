@@ -41,6 +41,7 @@
 
   /** Inverse of the above. Input is linear light, output is a 0..255 float. */
   function linearToSrgbChannel(lin) {
+    if (!Number.isFinite(lin)) return 0;
     const l = lin < 0 ? 0 : lin > 1 ? 1 : lin;
     const c = l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055;
     return c * 255;
@@ -48,6 +49,10 @@
 
   function clamp(x, lo, hi) {
     return x < lo ? lo : x > hi ? hi : x;
+  }
+
+  function fin(v) {
+    return Number.isFinite(v) ? v : 0;
   }
 
   function lerp(a, b, t) {
@@ -101,15 +106,15 @@
   /** sRGB (0..255 per channel) to CIE L*a*b* under D65. */
   function srgbToLab(r, g, b) {
     return linearToLab(
-      srgbChannelToLinear(r),
-      srgbChannelToLinear(g),
-      srgbChannelToLinear(b)
+      srgbChannelToLinear(clamp(fin(r), 0, 255)),
+      srgbChannelToLinear(clamp(fin(g), 0, 255)),
+      srgbChannelToLinear(clamp(fin(b), 0, 255))
     );
   }
 
   /** CIE L*a*b* (D65) to clamped sRGB floats on 0..255. */
   function labToSrgb(L, a, b) {
-    const xyz = labToXyz(L, a, b);
+    const xyz = labToXyz(fin(L), fin(a), fin(b));
     const lin = xyzToLinearRgb(xyz[0], xyz[1], xyz[2]);
     return [
       linearToSrgbChannel(lin[0]),
@@ -155,6 +160,7 @@
    * +90 above L* 50, -90 below, 0 at exactly 50.
    */
   function computeItaAngle(L, b) {
+    if (!Number.isFinite(L) || !Number.isFinite(b)) return NaN;
     if (b === 0) {
       if (L > 50) return 90;
       if (L < 50) return -90;
@@ -177,7 +183,10 @@
     Object.freeze({ id: 'dark', name: 'Dark', min: -90, max: -30, index: 6 })
   ]);
 
+  const ITA_INDETERMINATE = Object.freeze({ id: 'indeterminate', name: 'Indeterminate', min: NaN, max: NaN, index: 0 });
+
   function classifyItaCategory(ita) {
+    if (!Number.isFinite(ita)) return ITA_INDETERMINATE;
     if (ita > 55) return ITA_CATEGORIES[0];
     if (ita > 41) return ITA_CATEGORIES[1];
     if (ita > 28) return ITA_CATEGORIES[2];
@@ -194,7 +203,7 @@
   const UNDERTONE_CUTS = Object.freeze({ cool: 0.72, neutral: 0.52, warm: 0.4 });
 
   function classifyUndertone(a, b) {
-    if (!(b > 0)) return null;
+    if (!Number.isFinite(a) || !(b > 0)) return null;
     const r = a / b;
     if (r >= UNDERTONE_CUTS.cool) return 'Cool';
     if (r >= UNDERTONE_CUTS.neutral) return 'Neutral';
@@ -292,6 +301,7 @@
 
   /** Common rule-of-thumb wording for a CIEDE2000 distance. */
   function describeDeltaE(de) {
+    if (!Number.isFinite(de) || de < 0) return 'Not measurable';
     if (de < 1) return 'Not noticeable';
     if (de < 2) return 'Noticeable only on close inspection';
     if (de < 3.5) return 'Noticeable at a glance';
@@ -365,11 +375,19 @@
    * Styling heuristic, not a measurement: a lip target that sits darker and
    * redder than the skin sample at roughly the same hue family.
    */
+  function checkLabArg(name, lab) {
+    if (!Array.isArray(lab) || lab.length < 3 || !Number.isFinite(lab[0]) || !Number.isFinite(lab[1]) || !Number.isFinite(lab[2])) {
+      throw new TypeError(name + ' must be a [L, a, b] array of finite numbers');
+    }
+  }
+
   function lipTargetLab(skinLab) {
+    checkLabArg('skinLab', skinLab);
     return [Math.max(skinLab[0] - 14, 12), skinLab[1] + 22, skinLab[2] - 2];
   }
 
   function targetLabForKind(skinLab, kind) {
+    checkLabArg('skinLab', skinLab);
     if (kind === 'concealer') return [skinLab[0] + CONCEALER_LIGHTNESS_OFFSET, skinLab[1], skinLab[2]];
     if (kind === 'lip') return lipTargetLab(skinLab);
     return [skinLab[0], skinLab[1], skinLab[2]];
@@ -481,6 +499,10 @@
       { width: 320, height: 400, lab: [66, 12, 22], seed: 7, erythema: 0.5, pigment: 0.4, pores: 0.5, shine: 0.35 },
       options
     );
+    if (!Number.isInteger(o.width) || !Number.isInteger(o.height) || o.width <= 0 || o.height <= 0 || o.width > 4096 || o.height > 4096) {
+      throw new TypeError('specimen width and height must be positive integers up to 4096');
+    }
+    checkLabArg('lab', o.lab);
     const w = o.width;
     const h = o.height;
     const data = new Uint8ClampedArray(w * h * 4);
@@ -571,17 +593,34 @@
     return { width: w, height: h, data: data, lipMask: lipMask };
   }
 
+  /** Reject images whose RGBA buffer is missing or shorter than width x height x 4. */
+  function checkImage(image) {
+    if (
+      !image || !Number.isInteger(image.width) || !Number.isInteger(image.height) ||
+      image.width <= 0 || image.height <= 0 || !image.data ||
+      typeof image.data.length !== 'number' || image.data.length < image.width * image.height * 4
+    ) {
+      throw new TypeError('image must be { width, height, data } with positive integer size and full RGBA data');
+    }
+  }
+
   /** Copy a square window of RGBA pixels, clamped to the image bounds. */
   function extractPatch(image, cx, cy, size) {
-    const half = Math.floor(size / 2);
-    const x0 = clamp(Math.round(cx) - half, 0, Math.max(0, image.width - size));
-    const y0 = clamp(Math.round(cy) - half, 0, Math.max(0, image.height - size));
-    const w = Math.min(size, image.width);
-    const h = Math.min(size, image.height);
+    checkImage(image);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(size) || size < 1) {
+      throw new RangeError('extractPatch needs finite cx, cy and a size of at least 1');
+    }
+    const s = Math.floor(size);
+    const half = Math.floor(s / 2);
+    const x0 = clamp(Math.round(cx) - half, 0, Math.max(0, image.width - s));
+    const y0 = clamp(Math.round(cy) - half, 0, Math.max(0, image.height - s));
+    const w = Math.min(s, image.width);
+    const h = Math.min(s, image.height);
     const data = new Uint8ClampedArray(w * h * 4);
     for (let y = 0; y < h; y += 1) {
       const src = ((y0 + y) * image.width + x0) * 4;
-      data.set(image.data.subarray(src, src + w * 4), y * w * 4);
+      const row = typeof image.data.subarray === 'function' ? image.data.subarray(src, src + w * 4) : image.data.slice(src, src + w * 4);
+      data.set(row, y * w * 4);
     }
     return { width: w, height: h, data: data, x: x0, y: y0 };
   }
@@ -599,10 +638,13 @@ const SHINE_LIFT = 2;
 const SHINE_CHROMA_KEEP = 0.9;
 
   function checkPatch(patch) {
-    if (!patch || !(patch.width > 0) || !(patch.height > 0) || !patch.data) {
-      throw new TypeError('patch must be { width, height, data } with positive size');
+    if (
+      !patch || !Number.isInteger(patch.width) || !Number.isInteger(patch.height) ||
+      patch.width <= 0 || patch.height <= 0 || !patch.data
+    ) {
+      throw new TypeError('patch must be { width, height, data } with positive integer size');
     }
-    if (patch.data.length !== patch.width * patch.height * 4) {
+    if (typeof patch.data.length !== 'number' || patch.data.length !== patch.width * patch.height * 4) {
       throw new RangeError('patch.data length must equal width * height * 4');
     }
   }
@@ -640,10 +682,10 @@ const SHINE_CHROMA_KEEP = 0.9;
 
     for (let i = 0; i < n; i += 1) {
       const p = i * 4;
-      if (patch.data[p + 3] < 128) continue;
-      const rl = LINEAR_LUT[patch.data[p]];
-      const gl = LINEAR_LUT[patch.data[p + 1]];
-      const bl = LINEAR_LUT[patch.data[p + 2]];
+      if (!(patch.data[p + 3] >= 128)) continue;
+      const rl = LINEAR_LUT[patch.data[p] & 0xff];
+      const gl = LINEAR_LUT[patch.data[p + 1] & 0xff];
+      const bl = LINEAR_LUT[patch.data[p + 2] & 0xff];
       const lab = linearToLab(rl, gl, bl);
       valid[i] = 1;
       count += 1;
@@ -751,10 +793,11 @@ const SHINE_CHROMA_KEEP = 0.9;
    * acne and moisture need the API; they are listed in `unavailable`.
    */
   function localSkinScores(analysis) {
-    const pore = 100 - 100 * (1 - Math.exp(-analysis.poreDensity / PORE_DENSITY_SCALE));
-    const texture = 100 - analysis.roughnessIndex;
-    const oiliness = 100 - clamp(analysis.shineRatio * 800, 0, 100);
-    const redness = 100 - clamp(analysis.rednessCoverage * 200, 0, 100);
+    if (!analysis || typeof analysis !== 'object') throw new TypeError('analysis must be an object');
+    const pore = 100 - 100 * (1 - Math.exp(-fin(analysis.poreDensity) / PORE_DENSITY_SCALE));
+    const texture = 100 - fin(analysis.roughnessIndex);
+    const oiliness = 100 - clamp(fin(analysis.shineRatio) * 800, 0, 100);
+    const redness = 100 - clamp(fin(analysis.rednessCoverage) * 200, 0, 100);
     return {
       scores: {
         hd_pore: clamp(pore, 0, 100),
@@ -792,24 +835,25 @@ const SHINE_CHROMA_KEEP = 0.9;
 
   /** Separable box blur of a Float32Array image using running sums. */
   function boxBlur(src, w, h, radius) {
+    const r = clamp(Math.floor(fin(radius)), 0, 512);
     const tmp = new Float32Array(w * h);
     const out = new Float32Array(w * h);
-    const span = radius * 2 + 1;
+    const span = r * 2 + 1;
     for (let y = 0; y < h; y += 1) {
       const row = y * w;
       let sum = 0;
-      for (let k = -radius; k <= radius; k += 1) sum += src[row + clamp(k, 0, w - 1)];
+      for (let k = -r; k <= r; k += 1) sum += src[row + clamp(k, 0, w - 1)];
       for (let x = 0; x < w; x += 1) {
         tmp[row + x] = sum / span;
-        sum += src[row + clamp(x + radius + 1, 0, w - 1)] - src[row + clamp(x - radius, 0, w - 1)];
+        sum += src[row + clamp(x + r + 1, 0, w - 1)] - src[row + clamp(x - r, 0, w - 1)];
       }
     }
     for (let x = 0; x < w; x += 1) {
       let sum = 0;
-      for (let k = -radius; k <= radius; k += 1) sum += tmp[clamp(k, 0, h - 1) * w + x];
+      for (let k = -r; k <= r; k += 1) sum += tmp[clamp(k, 0, h - 1) * w + x];
       for (let y = 0; y < h; y += 1) {
         out[y * w + x] = sum / span;
-        sum += tmp[clamp(y + radius + 1, 0, h - 1) * w + x] - tmp[clamp(y - radius, 0, h - 1) * w + x];
+        sum += tmp[clamp(y + r + 1, 0, h - 1) * w + x] - tmp[clamp(y - r, 0, h - 1) * w + x];
       }
     }
     return out;
@@ -821,6 +865,7 @@ const SHINE_CHROMA_KEEP = 0.9;
    * (erythema in carmine, melanin in sage) and not the lighting gradient.
    */
   function buildChromophoreMap(image) {
+    checkImage(image);
     const w = image.width;
     const h = image.height;
     const n = w * h;
@@ -828,8 +873,8 @@ const SHINE_CHROMA_KEEP = 0.9;
     const m = new Float32Array(n);
     for (let i = 0; i < n; i += 1) {
       const p = i * 4;
-      const rl = LINEAR_LUT[image.data[p]];
-      const gl = LINEAR_LUT[image.data[p + 1]];
+      const rl = LINEAR_LUT[image.data[p] & 0xff];
+      const gl = LINEAR_LUT[image.data[p + 1] & 0xff];
       e[i] = Math.log10(Math.max(rl, 1e-4) / Math.max(gl, 1e-4));
       m[i] = Math.log10(1 / Math.max(rl, 1e-4));
     }
@@ -841,9 +886,9 @@ const SHINE_CHROMA_KEEP = 0.9;
     const out = new Uint8ClampedArray(n * 4);
     for (let i = 0; i < n; i += 1) {
       const p = i * 4;
-      const rl = LINEAR_LUT[image.data[p]];
-      const gl = LINEAR_LUT[image.data[p + 1]];
-      const bl = LINEAR_LUT[image.data[p + 2]];
+      const rl = LINEAR_LUT[image.data[p] & 0xff];
+      const gl = LINEAR_LUT[image.data[p + 1] & 0xff];
+      const bl = LINEAR_LUT[image.data[p + 2] & 0xff];
       const ae = clamp((eDev[i] / eSd - 0.6) / 2.4, 0, 1) * 0.85;
       const am = clamp((mDev[i] / mSd - 0.6) / 2.4, 0, 1) * 0.85;
       const grey = linearToSrgbChannel(0.2126 * rl + 0.7152 * gl + 0.0722 * bl);
@@ -897,10 +942,15 @@ const SHINE_CHROMA_KEEP = 0.9;
    * options: coverage 0..1, glow 0..1, smoothing 0..1, meanLab, mask, lipMask.
    */
   function applyFoundation(image, shadeLab, options) {
+    checkImage(image);
+    checkLabArg('shadeLab', shadeLab);
     const o = Object.assign({ coverage: 0.6, glow: 0.1, smoothing: 0.55 }, options);
+    o.coverage = clamp(fin(o.coverage), 0, 1);
+    o.glow = clamp(fin(o.glow), 0, 1);
+    o.smoothing = clamp(fin(o.smoothing), 0, 1);
     const n = image.width * image.height;
     const out = new Uint8ClampedArray(image.data.length);
-    let mean = o.meanLab;
+    let mean = Array.isArray(o.meanLab) && o.meanLab.length >= 3 && Number.isFinite(o.meanLab[0]) && Number.isFinite(o.meanLab[1]) && Number.isFinite(o.meanLab[2]) ? o.meanLab : null;
     if (!mean) {
       let sL = 0;
       let sA = 0;
@@ -943,9 +993,9 @@ const SHINE_CHROMA_KEEP = 0.9;
   }
 
   function pixelWeight(image, i, o) {
-    let wgt = o.mask ? o.mask[i] : skinMaskAlpha(image.data[i * 4], image.data[i * 4 + 1], image.data[i * 4 + 2]);
-    if (o.lipMask) wgt *= 1 - o.lipMask[i];
-    return wgt;
+    let wgt = o.mask ? fin(o.mask[i]) : skinMaskAlpha(image.data[i * 4] & 0xff, image.data[i * 4 + 1] & 0xff, image.data[i * 4 + 2] & 0xff);
+    if (o.lipMask) wgt *= 1 - clamp(fin(o.lipMask[i]), 0, 1);
+    return clamp(wgt, 0, 1);
   }
 
   /**
@@ -954,23 +1004,27 @@ const SHINE_CHROMA_KEEP = 0.9;
    * options: intensity 0..1, finish 'matte' | 'satin' | 'gloss'.
    */
   function applyLipColor(image, lipMask, shadeLab, options) {
+    checkImage(image);
+    checkLabArg('shadeLab', shadeLab);
     const o = Object.assign({ intensity: 0.85, finish: 'satin' }, options);
+    o.intensity = clamp(fin(o.intensity), 0, 1);
+    const mask = lipMask && typeof lipMask.length === 'number' ? lipMask : [];
     const n = image.width * image.height;
     const out = new Uint8ClampedArray(image.data.length);
     let sL = 0;
     let wsum = 0;
     for (let i = 0; i < n; i += 1) {
-      if (lipMask[i] <= 0) continue;
+      if (!(mask[i] > 0)) continue;
       const lab = srgbToLab(image.data[i * 4], image.data[i * 4 + 1], image.data[i * 4 + 2]);
-      sL += lab[0] * lipMask[i];
-      wsum += lipMask[i];
+      sL += lab[0] * mask[i];
+      wsum += mask[i];
     }
     const meanL = wsum > 0 ? sL / wsum : shadeLab[0];
     const detail = o.finish === 'matte' ? 0.55 : o.finish === 'gloss' ? 0.8 : 0.7;
     const glossLift = o.finish === 'gloss' ? 1.25 : o.finish === 'satin' ? 0.35 : 0;
     for (let i = 0; i < n; i += 1) {
       const p = i * 4;
-      const m = clamp(lipMask[i] * o.intensity, 0, 1);
+      const m = clamp(fin(mask[i]) * o.intensity, 0, 1);
       if (m <= 0) {
         out[p] = image.data[p];
         out[p + 1] = image.data[p + 1];
@@ -1066,6 +1120,97 @@ const SHINE_CHROMA_KEEP = 0.9;
     return hd > 0 ? 'hd' : 'sd';
   }
 
+  function ipv4Parts(host) {
+    const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+    if (!m) return null;
+    const p = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
+    for (let i = 0; i < 4; i += 1) {
+      if (p[i] < 0 || p[i] > 255) return null;
+    }
+    return p;
+  }
+
+  /* Loopback, private, link-local, CGNAT, multicast, reserved and documentation ranges. */
+  function isPrivateIpv4Host(host) {
+    const p = ipv4Parts(host);
+    if (!p) return false;
+    const a = p[0];
+    const b = p[1];
+    const c = p[2];
+    if (a === 0 || a === 10 || a === 127 || a >= 224) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;              // CGNAT 100.64.0.0/10
+    if (a === 169 && b === 254) return true;                        // link-local
+    if (a === 172 && b >= 16 && b <= 31) return true;               // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;                        // 192.168.0.0/16
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return true;  // 192.0.0.0/24 IETF + TEST-NET-1 192.0.2.0/24
+    if (a === 192 && b === 88 && c === 99) return true;             // 192.88.99.0/24 relay
+    if (a === 198 && (b === 18 || b === 19)) return true;           // 198.18.0.0/15 benchmarking
+    if (a === 198 && b === 51 && c === 100) return true;            // TEST-NET-2
+    if (a === 203 && b === 0 && c === 113) return true;             // TEST-NET-3
+    return false;
+  }
+
+  /* Expand an IPv6 literal to 8 hex groups, or null when malformed. */
+  function expandIpv6(host) {
+    const inner = host.slice(1, -1).toLowerCase();
+    const halves = inner.split('::');
+    if (halves.length > 2) return null;
+    const head = halves[0] === '' ? [] : halves[0].split(':');
+    const tail = halves.length === 2 && halves[1] !== '' ? halves[1].split(':') : [];
+    if (halves.length === 1 && head.length !== 8) return null;
+    let groups = head.concat(tail);
+    const last = groups[groups.length - 1];
+    if (last && last.indexOf('.') !== -1) {
+      const v4 = ipv4Parts(last);
+      if (!v4) return null;
+      groups = groups
+        .slice(0, -1)
+        .concat([((v4[0] << 8) | v4[1]).toString(16), ((v4[2] << 8) | v4[3]).toString(16)]);
+    }
+    let out;
+    if (halves.length === 2) {
+      const tailFixed = groups.slice(head.length);
+      const missing = 8 - head.length - tailFixed.length;
+      if (missing < 0) return null;
+      const zeros = [];
+      for (let i = 0; i < missing; i += 1) zeros.push('0');
+      out = head.concat(zeros).concat(tailFixed);
+    } else {
+      out = groups;
+    }
+    if (out.length !== 8) return null;
+    const nums = out.map(function (g) {
+      if (!/^[0-9a-f]{1,4}$/.test(g)) return NaN;
+      return parseInt(g, 16);
+    });
+    return nums.every(Number.isFinite) ? nums : null;
+  }
+
+  function isPrivateIpv6Host(host) {
+    const g = expandIpv6(host);
+    if (!g) return true;
+    const g0 = g[0];
+    const g1 = g[1];
+    if (g0 === 0 && g1 === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0) {
+      // ::/96 space: unspecified ::, loopback ::1, ::ffff:a.b.c.d mapped, ::a.b.c.d compat
+      if (g[5] === 0xffff || g[5] === 0) {
+        if (g[6] === 0 && g[7] <= 1) return true;
+        return isPrivateIpv4Host(((g[6] >> 8) & 255) + '.' + (g[6] & 255) + '.' + ((g[7] >> 8) & 255) + '.' + (g[7] & 255));
+      }
+      return true;
+    }
+    if (g0 === 0) return true;                                    // other 0000::/8 reserved space
+    if ((g0 & 0xffc0) === 0xfe80) return true;                    // fe80::/10 link-local
+    if ((g0 & 0xffc0) === 0xfec0) return true;                    // fec0::/10 site-local (deprecated)
+    if ((g0 & 0xfe00) === 0xfc00) return true;                    // fc00::/7 unique local
+    if ((g0 & 0xfff0) === 0x3ff0) return true;                    // 3fff::/20 documentation
+    if (g0 === 0x0064 && g1 === 0xff9b) return true;              // NAT64 64:ff9b::/96 and 64:ff9b:1::/48
+    if (g0 === 0x2002) return true;                               // 6to4 embedded IPv4
+    if (g0 === 0x2001 && (g1 < 0x0100 || g1 === 0x0db8)) return true; // Teredo + IANA special + docs
+    if (g0 >= 0xff00) return true;                                // multicast
+    return false;
+  }
+
   function isPublicHttpsUrl(url) {
     let u;
     try {
@@ -1074,11 +1219,16 @@ const SHINE_CHROMA_KEEP = 0.9;
       return false;
     }
     if (u.protocol !== 'https:') return false;
-    const host = u.hostname.toLowerCase();
-    if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return false;
-    if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host)) return false;
-    if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
-    if (host === '[::1]' || host === '0.0.0.0') return false;
+    let host = u.hostname.toLowerCase();
+    if (host === '' || host.indexOf('%') !== -1) return false;
+    if (host.charAt(0) === '[') return !isPrivateIpv6Host(host);
+    while (host.charAt(host.length - 1) === '.') host = host.slice(0, -1);
+    if (/[^a-z0-9.\-]/.test(host)) return false;
+    if (host.indexOf('.') === -1) return false;
+    const badSuffix = ['.local', '.localhost', '.localdomain', '.internal', '.lan', '.corp', '.home', '.intranet', '.private', '.arpa'];
+    if (host === 'localhost' || badSuffix.some(function (s) { return host.endsWith(s); })) return false;
+    if (/^[0-9.]+$/.test(host)) return isPrivateIpv4Host(host) === false && ipv4Parts(host) !== null ? true : false;
+    if (isPrivateIpv4Host(host)) return false;
     return true;
   }
 
@@ -1157,6 +1307,7 @@ const SHINE_CHROMA_KEEP = 0.9;
       fail('invalid_effect', 'effect.palettes must be a non-empty array');
     }
     palettes.forEach(function (p) {
+      if (!p || typeof p !== 'object') fail('invalid_effect', 'each palette must be an object');
       checkHexColour('palette color', p.color);
       checkIntensity('colorIntensity', p.colorIntensity);
       if (effect.category === 'foundation') {
@@ -1204,15 +1355,20 @@ const SHINE_CHROMA_KEEP = 0.9;
     if (task !== 'skin-analysis' && task !== 'makeup-vto') {
       fail('invalid_task', 'task must be skin-analysis or makeup-vto');
     }
-    const hasUrl = o.src_file_url !== undefined && o.src_file_url !== '';
-    const hasId = o.src_file_id !== undefined && o.src_file_id !== '';
+    const sawUrl = o.src_file_url !== undefined && o.src_file_url !== '';
+    const sawId = o.src_file_id !== undefined && o.src_file_id !== '';
+    if (sawUrl && typeof o.src_file_url !== 'string') fail('invalid_source', 'src_file_url must be a string');
+    if (sawId && typeof o.src_file_id !== 'string') fail('invalid_source', 'src_file_id must be a string');
+    const hasUrl = sawUrl;
+    const hasId = sawId;
     if (hasUrl === hasId) fail('invalid_source', 'provide exactly one of src_file_url or src_file_id');
-    if (hasUrl && !isPublicHttpsUrl(o.src_file_url)) {
+    const srcUrl = hasUrl ? o.src_file_url.trim() : null;
+    if (srcUrl !== null && !isPublicHttpsUrl(srcUrl)) {
       fail('invalid_source', 'src_file_url must be a publicly reachable https URL');
     }
 
     const body = {};
-    if (hasUrl) body.src_file_url = o.src_file_url;
+    if (srcUrl !== null) body.src_file_url = srcUrl;
     else body.src_file_id = o.src_file_id;
 
     if (task === 'skin-analysis') {
@@ -1231,12 +1387,16 @@ const SHINE_CHROMA_KEEP = 0.9;
       const format = o.format === undefined ? 'json' : o.format;
       if (format !== 'json' && format !== 'zip') fail('invalid_format', 'format must be json or zip');
       body.format = format;
-      if (o.miniserver_args) body.miniserver_args = o.miniserver_args;
+      if (o.miniserver_args !== undefined) {
+        if (!o.miniserver_args || typeof o.miniserver_args !== 'object') fail('invalid_args', 'miniserver_args must be an object');
+        body.miniserver_args = o.miniserver_args;
+      }
     } else {
       if (!Array.isArray(o.effects) || o.effects.length === 0) fail('invalid_effect', 'effects must be a non-empty array');
       o.effects.forEach(validateMakeupEffect);
+      if (o.version !== undefined && typeof o.version !== 'string') fail('invalid_version', 'version must be a string');
       body.version = o.version || YOUCAM.effectSpecVersion;
-      body.effects = o.effects;
+      body.effects = o.effects.slice();
     }
 
     return {
@@ -1250,9 +1410,10 @@ const SHINE_CHROMA_KEEP = 0.9;
   /** Copyable curl for a request from buildYouCamTaskPayload. */
   function buildYouCamCurl(request) {
     const json = JSON.stringify(request.body, null, 2).replace(/'/g, "'\\''");
+    const url = String(request.url).replace(/'/g, "'\\''");
     return [
       'curl --request ' + request.method + ' \\',
-      "  --url '" + request.url + "' \\",
+      "  --url '" + url + "' \\",
       "  --header 'Authorization: Bearer YOUR_API_KEY' \\",
       "  --header 'Content-Type: application/json' \\",
       "  --data '" + json + "'"
@@ -1292,19 +1453,25 @@ const SHINE_CHROMA_KEEP = 0.9;
     return 'Priority';
   }
 
+  function cleanScore(v) {
+    return typeof v === 'number' && Number.isFinite(v) ? clamp(v, 0, 100) : null;
+  }
+
   function makeConcern(action, region, rawScore, uiScore, maskCount) {
     const key = concernKey(action);
-    const score = typeof rawScore === 'number' ? rawScore : uiScore;
+    const raw = cleanScore(rawScore);
+    const ui = cleanScore(uiScore);
+    const score = raw !== null ? raw : ui;
     return {
       action: action,
       concern: key,
       label: CONCERN_LABELS[key] || key,
       region: region || 'whole',
       hd: String(action).indexOf('hd_') === 0,
-      rawScore: typeof rawScore === 'number' ? rawScore : null,
-      uiScore: typeof uiScore === 'number' ? uiScore : null,
-      score: typeof score === 'number' ? score : null,
-      band: typeof score === 'number' ? scoreBand(score) : null,
+      rawScore: raw,
+      uiScore: ui,
+      score: score,
+      band: score === null ? null : scoreBand(score),
       maskCount: maskCount || 0
     };
   }
@@ -1339,9 +1506,9 @@ const SHINE_CHROMA_KEEP = 0.9;
         throw new SyntaxError('response is not valid JSON');
       }
     }
-    if (!doc || typeof doc !== 'object') throw new TypeError('response must be an object or JSON string');
+    if (!doc || typeof doc !== 'object' || Array.isArray(doc)) throw new TypeError('response must be an object or JSON string');
 
-    const data = doc.data && typeof doc.data === 'object' ? doc.data : doc;
+    const data = doc.data && typeof doc.data === 'object' && !Array.isArray(doc.data) ? doc.data : doc;
     const result = {
       taskStatus: data.task_status || null,
       error: data.error || null,
@@ -1356,18 +1523,18 @@ const SHINE_CHROMA_KEEP = 0.9;
     }
     if (data.task_status === 'error' || data.task_status === 'running') return result;
 
-    const results = data.results && typeof data.results === 'object' ? data.results : data;
+    const results = data.results && typeof data.results === 'object' && !Array.isArray(data.results) ? data.results : data;
 
     if (Array.isArray(results.output)) {
       results.output.forEach(function (entry) {
         if (!entry || typeof entry !== 'object') return;
         if (entry.type === undefined && typeof entry.score === 'number') {
-          result.overall = entry.score;
+          result.overall = cleanScore(entry.score);
           return;
         }
         if (typeof entry.type !== 'string') return;
         if (typeof entry.raw_score !== 'number' && typeof entry.ui_score !== 'number') {
-          if (typeof entry.score === 'number') result.overall = entry.score;
+          if (typeof entry.score === 'number') result.overall = cleanScore(entry.score);
           return;
         }
         result.concerns.push(
@@ -1376,13 +1543,14 @@ const SHINE_CHROMA_KEEP = 0.9;
       });
     } else {
       Object.keys(results).forEach(function (key) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
         const v = results[key];
         if (key === 'all') {
-          if (v && typeof v.score === 'number') result.overall = v.score;
+          if (v && typeof v.score === 'number') result.overall = cleanScore(v.score);
           return;
         }
         if (key === 'skin_age') {
-          if (typeof v === 'number') result.skinAge = v;
+          if (typeof v === 'number' && Number.isFinite(v) && v >= 0) result.skinAge = Math.round(v);
           return;
         }
         if (!v || typeof v !== 'object') return;
@@ -1398,7 +1566,13 @@ const SHINE_CHROMA_KEEP = 0.9;
         }
       });
     }
-    if (typeof data.skin_age === 'number') result.skinAge = data.skin_age;
+    if (typeof data.skin_age === 'number' && Number.isFinite(data.skin_age) && data.skin_age >= 0) {
+      result.skinAge = Math.round(data.skin_age);
+    }
+    if (result.concerns.length > 200) {
+      result.concerns.length = 200;
+      result.warnings.push('Only the first 200 concern scores are kept.');
+    }
     if (result.concerns.length === 0 && result.taskStatus !== 'running') {
       result.warnings.push('No concern scores were found in this response.');
     }
@@ -1431,8 +1605,11 @@ const SHINE_CHROMA_KEEP = 0.9;
    * input: { concerns, ranking: { foundation, concealer, lip }, tone, source }
    */
   function buildRegimenReceipt(input) {
-    const concerns = (input.concerns || []).filter(function (c) {
-      return typeof c.score === 'number';
+    const src = input && typeof input === 'object' ? input : {};
+    const tone = src.tone && Array.isArray(src.tone.lab) && src.tone.lab.length >= 3 &&
+      src.tone.lab.every(Number.isFinite) && Number.isFinite(src.tone.ita) ? src.tone : null;
+    const concerns = (Array.isArray(src.concerns) ? src.concerns : []).filter(function (c) {
+      return c && typeof c.score === 'number' && Number.isFinite(c.score);
     });
     const ordered = concerns.slice().sort(function (p, q) {
       return p.score - q.score;
@@ -1447,16 +1624,16 @@ const SHINE_CHROMA_KEEP = 0.9;
       steps.push({ concern: c.concern, label: c.label, band: c.band, score: c.score, step: step });
     });
     const lines = [];
-    lines.push('DermaVTO receipt (' + (input.source === 'youcam' ? 'YouCam scores' : 'local estimate') + ')');
-    if (input.tone) {
+    lines.push('DermaVTO receipt (' + (src.source === 'youcam' ? 'YouCam scores' : 'local estimate') + ')');
+    if (tone) {
       lines.push(
-        'Tone, L* ' + input.tone.lab[0].toFixed(1) + ', a* ' + input.tone.lab[1].toFixed(1) + ', b* ' +
-          input.tone.lab[2].toFixed(1) + ', ITA ' + input.tone.ita.toFixed(1) + ' degrees (' +
-          input.tone.category.name + '), undertone ' + (input.tone.undertone || 'not rated') + ' (heuristic)'
+        'Tone, L* ' + tone.lab[0].toFixed(1) + ', a* ' + tone.lab[1].toFixed(1) + ', b* ' +
+          tone.lab[2].toFixed(1) + ', ITA ' + tone.ita.toFixed(1) + ' degrees (' +
+          tone.category.name + '), undertone ' + (tone.undertone || 'not rated') + ' (heuristic)'
       );
     }
     ['foundation', 'concealer', 'lip'].forEach(function (kind) {
-      const rows = input.ranking && input.ranking[kind];
+      const rows = src.ranking && src.ranking[kind];
       if (rows && rows[0]) {
         lines.push(
           kind.charAt(0).toUpperCase() + kind.slice(1) + ', ' + rows[0].swatch.name + ' ' + rows[0].swatch.hex +

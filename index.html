@@ -6,6 +6,7 @@
   <title>DermaVTO | Skin tone reading and virtual try on</title>
   <meta name="description" content="Read skin colour in CIE L*a*b*, rank 24 reference shades by CIEDE2000, preview foundation and lip colour, and build YouCam API requests. Everything runs in your browser.">
   <meta name="theme-color" content="#faf7f2">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="DermaVTO">
   <meta property="og:title" content="DermaVTO | Skin tone reading and virtual try on">
@@ -129,7 +130,7 @@
         </div>
       </div>
 
-      <figure class="stage" id="stage" style="--split: 50%">
+      <figure class="stage" id="stage">
         <div class="stage-frame" id="stage-frame">
           <canvas id="canvas-raw" width="640" height="800" aria-hidden="true"></canvas>
           <canvas id="canvas-result" width="640" height="800" aria-hidden="true"></canvas>
@@ -143,7 +144,7 @@
           <div class="stage-ring" id="stage-ring" hidden></div>
           <label class="visually-hidden" for="split">Divider position. Raw sample on the left, result on the right.</label>
           <input class="stage-range" id="split" type="range" min="0" max="100" value="50" step="1">
-          <div class="stage-picker" id="stage-picker" hidden tabindex="0" role="application" aria-label="Skin patch picker. Arrow keys move the sampled patch. Enter reads it again."></div>
+          <div class="stage-picker" id="stage-picker" hidden tabindex="0" role="group" aria-label="Skin patch picker. Arrow keys move the sampled patch. Enter reads it again."></div>
         </div>
         <figcaption id="stage-caption">A procedural skin specimen. It is a colour and texture study, not a picture of a person.</figcaption>
       </figure>

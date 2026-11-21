@@ -88,8 +88,14 @@
       return json;
     }
 
+    /* Only the headers a signed storage PUT legitimately needs; credentials are never forwarded. */
+    const SAFE_UPLOAD_HEADER = /^(content-type|x-amz-|x-goog-|x-ms-)/i;
+
     /** Upload a File through the File API and return its file_id. */
     async function uploadFile(file) {
+      if (!file || typeof file.type !== 'string' || typeof file.size !== 'number' || typeof file.name !== 'string') {
+        throw new YouCamApiError('Choose an image file first.');
+      }
       o.onProgress('Asking YouCam for an upload slot.');
       const meta = await call('POST', '/s2s/v2.0/file', {
         files: [{ content_type: mimeFor(file), file_name: file.name, file_size: file.size }]
@@ -97,14 +103,18 @@
       const slot = meta && meta.data && meta.data.files && meta.data.files[0];
       const target = slot && slot.requests && slot.requests[0];
       if (!slot || !slot.file_id || !target || !target.url) throw new YouCamApiError('YouCam did not return an upload slot.');
+      // The photo bytes go wherever this URL points, so it must be a real public https host.
+      if (!E.isPublicHttpsUrl(target.url)) throw new YouCamApiError('YouCam returned an upload address this client refuses to use.');
       const headers = {};
       Object.keys(target.headers || {}).forEach(function (k) {
-        if (k.toLowerCase() !== 'content-length') headers[k] = target.headers[k];
+        if (SAFE_UPLOAD_HEADER.test(k)) headers[k] = target.headers[k];
       });
+      const method = String(target.method || 'PUT').toUpperCase();
+      if (method !== 'PUT' && method !== 'POST') throw new YouCamApiError('YouCam returned an upload method this client refuses to use.');
       o.onProgress('Uploading the photo to YouCam.');
       let res;
       try {
-        res = await o.fetchImpl(target.url, { method: target.method || 'PUT', headers: headers, body: file });
+        res = await o.fetchImpl(target.url, { method: method, headers: headers, body: file });
       } catch (err) {
         throw new YouCamApiError('The photo upload was blocked or failed before it finished.');
       }
@@ -114,11 +124,16 @@
 
     async function pollTask(name, taskId) {
       const started = o.now();
-      for (;;) {
+      const timeoutMs = Number.isFinite(o.timeoutMs) && o.timeoutMs > 0 ? o.timeoutMs : 180000;
+      const maxAttempts = Math.max(5, Math.ceil(timeoutMs / Math.max(o.pollMs, 1)) + 2);
+      for (let attempt = 1;; attempt += 1) {
         const json = await call('GET', '/s2s/v2.0/task/' + name + '/' + encodeURIComponent(taskId));
         const status = json && json.data && json.data.task_status;
         if (status === 'success' || status === 'error') return json;
-        if (o.now() - started > o.timeoutMs) throw new YouCamApiError('The task did not finish in time. Try again later.');
+        const elapsed = o.now() - started;
+        if (!Number.isFinite(elapsed) || elapsed > timeoutMs || attempt >= maxAttempts) {
+          throw new YouCamApiError('The task did not finish in time. Try again later.');
+        }
         o.onProgress('The task is running.');
         await o.sleep(o.pollMs);
       }
@@ -148,6 +163,9 @@
       }
       const url = raw.data.results && raw.data.results.url;
       if (!url) throw new YouCamApiError('The try on task finished without a result link.');
+      if (typeof url !== 'string' || !E.isPublicHttpsUrl(url)) {
+        throw new YouCamApiError('YouCam returned a result link this client refuses to use.');
+      }
       return { raw: raw, url: url };
     }
 

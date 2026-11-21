@@ -12,7 +12,6 @@
 
 html {
   overflow-x: clip;
-  scroll-behavior: smooth;
   scroll-padding-top: var(--space-5);
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
