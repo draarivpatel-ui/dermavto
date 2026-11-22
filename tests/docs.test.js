@@ -10,7 +10,7 @@ const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
 
 describe('repository files', () => {
   ['README.md', 'NOTES.md', 'DESIGN.md', 'LICENSE', 'video/SUBMISSION.md', 'video/narration.txt', '.nojekyll', 'og.png',
-    'tokens.css', 'styles.css', 'engine.js', 'render.js', 'app.js', 'youcam-live.js', 'index.html'].forEach((name) => {
+    'tokens.css', 'styles.css', 'engine.js', 'render.js', 'app.js', 'youcam-live.js', 'fairness-lab.js', 'index.html'].forEach((name) => {
     it('has ' + name, () => {
       assert.ok(fs.existsSync(path.join(ROOT, name)), name);
     });
@@ -87,7 +87,7 @@ describe('privacy and honesty of the written files', () => {
   });
 
   it('has no unfinished markers', () => {
-    ['README.md', 'NOTES.md', 'DESIGN.md', 'video/SUBMISSION.md', 'index.html', 'app.js', 'engine.js', 'render.js', 'youcam-live.js', 'styles.css'].forEach((f) => {
+    ['README.md', 'NOTES.md', 'DESIGN.md', 'video/SUBMISSION.md', 'index.html', 'app.js', 'engine.js', 'render.js', 'youcam-live.js', 'fairness-lab.js', 'styles.css'].forEach((f) => {
       assert.doesNotMatch(read(f), /\b(TODO|FIXME|XXX|lorem ipsum|placeholder text)\b/i, f);
     });
   });

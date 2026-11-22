@@ -17,6 +17,7 @@ It was built for the YouCam API Skin AI and eCommerce VTO Hackathon. It is an in
 - **Shade ranking.** 13 foundation, 6 concealer and 5 lip reference swatches ranked by CIEDE2000 to a target taken from your sample, with the top three marked on an ITA plot and an undertone compass.
 - **YouCam tools.** A request builder with the same validation the API applies (HD and SD actions cannot be mixed, public https links only, integer intensities from 0 to 100), a response inspector that reads both the `format=json` response and a `score_info.json`, and a routine and shade receipt.
 - **Live run.** Optional. Paste your own YouCam key, tick the consent box, and the page calls the API straight from your browser.
+- **Screening literacy workbench.** An ABCDE checklist that turns the published warning signs into an honest literacy score and a referral urgency tag, a fairness audit of one referral threshold across Fitzpatrick types I to VI on synthetic records generated in the tab, and a photo readiness gate for a telederm visit. The audit shows sensitivity and specificity per type with Wilson 95% intervals, expected calibration error, and the sensitivity gap between types I-II and V-VI on an interactive SVG chart. The workbench state exports as checksummed JSON, CSV or Markdown, bookmark by URL, and a self test panel proves the maths in the browser. All of it is educational. None of it is a medical judgement.
 
 ![Chromophore map mode](screenshots/chromophore-map.png)
 
@@ -70,10 +71,14 @@ The paths are `v2.0`. The `1.0` that appears in the makeup documentation is the 
 - The 24 reference swatches were specified for this project in L*a*b* and stored as hex. They are generic names, not any brand's products.
 - The skin specimen is a texture study with shading, pores, mottled redness, pigment spots, a highlight and a lip shape. It is not a picture of a person. On a photo, foundation uses a colour window for skin and not face tracking, and lips are coloured only on the specimen.
 - All numbers here are cosmetic and educational colour measurements. They are not a clinical assessment and cannot replace a dermatologist.
+- The ABCDE score is a checklist literacy score. It is not a diagnosis, not a probability of disease, and a low score rules nothing out. A spot that worries you is reason enough to book.
+- The fairness cohort is synthetic, seeded and deliberately built with a weaker planted assessor on types V and VI. The gap it shows demonstrates the audit method. It is not a clinical study and says nothing about any real product.
+- The SHA-256 digest on exports is unkeyed tamper detection. It shows whether a file changed after export. It is not a signature and cannot say who wrote it.
+- The photo gate judges the photograph only. It cannot judge what the photo shows, and the scale reference is a user confirmation, not a measurement.
 
 ## Tests
 
-`npm test` runs the suite with `node --test`. It covers the colour maths (including all 34 published CIEDE2000 pairs to four decimals), ITA bands and boundaries, the undertone heuristic, swatch ranking, seeded specimen generation, patch analysis, try on rendering, the YouCam payload builder and normalizer, the live client against a scripted network, the page's markup and styles, and `app.js` running against a stand-in DOM.
+`npm test` runs the suite with `node --test`. It covers the colour maths (including all 34 published CIEDE2000 pairs to four decimals), ITA bands and boundaries, the undertone heuristic, swatch ranking, seeded specimen generation, patch analysis, try on rendering, the YouCam payload builder and normalizer, the live client against a scripted network, the page's markup and styles, `app.js` running against a stand-in DOM, and the workbench module `fairness-lab.js`. The lab tests cover the ABCDE scoring and monotonicity, Wilson interval ordering, cohort partition conservation, fairness metrics and gaps, the photo gate, CSV injection escaping, export tamper detection, the `#derm=` bookmark codec, SVG escaping, and FIPS 180-4 SHA-256 known answer vectors.
 
 ## References
 

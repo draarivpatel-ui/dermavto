@@ -11,6 +11,7 @@
   const E = window.DermaVTO;
   const R = window.DermaRender;
   const Y = window.DermaYouCam;
+  const F = window.DermaFairness;
 
   const W = 640;
   const H = 800;
@@ -108,7 +109,35 @@
     receiptText: $('receipt-text'),
     receiptSource: $('receipt-source'),
     receiptCopy: $('receipt-copy'),
-    receiptNote: $('receipt-note')
+    receiptNote: $('receipt-note'),
+    abcdeScore: $('abcde-score'),
+    abcdeBand: $('abcde-band'),
+    abcdeNote: $('abcde-note'),
+    fairThreshold: $('fair-threshold'),
+    fairThresholdOut: $('fair-threshold-out'),
+    fairChartHost: $('fair-chart-host'),
+    fairTableHost: $('fair-table-host'),
+    fairNote: $('fair-note'),
+    pqScale: $('pq-scale'),
+    pqRun: $('pq-run'),
+    pqList: $('pq-list'),
+    pqVerdict: $('pq-verdict'),
+    prepUrgency: $('prep-urgency'),
+    prepNote: $('prep-note'),
+    prepList: $('prep-list'),
+    exCopyJson: $('ex-copy-json'),
+    exCopyCsv: $('ex-copy-csv'),
+    exCopyMd: $('ex-copy-md'),
+    exDownload: $('ex-download'),
+    exChecksum: $('ex-checksum'),
+    exCopyNote: $('ex-copy-note'),
+    dermBookmark: $('derm-bookmark'),
+    exVerify: $('ex-verify'),
+    exVerifyRun: $('ex-verify-run'),
+    exVerifyStatus: $('ex-verify-status'),
+    selftestRun: $('selftest-run'),
+    selftestList: $('selftest-list'),
+    labStatus: $('lab-status')
   };
 
   const state = {
@@ -125,6 +154,14 @@
     mode: 'tryon',
     sampling: false,
     yc: { json: '', curl: '', concerns: null, overall: null, skinAge: null },
+    abcdeGrades: { A: 0, B: 0, C: 0, D: 0, E: 0 },
+    abcdeResult: null,
+    threshold: 65,
+    scaleConfirmed: false,
+    cohort: null,
+    audit: null,
+    quality: null,
+    exportBundle: null,
     queued: false
   };
 
@@ -257,6 +294,7 @@
     renderRanking();
     renderResult();
     renderYouCam();
+    renderChecksum();
     say(R.describeReading(state.analysis, state.ranking));
   }
 
@@ -656,6 +694,267 @@
   }
 
   /* ------------------------------------------------------------ */
+  /* Screening literacy and fairness workbench                     */
+  /* ------------------------------------------------------------ */
+
+  function labSay(text) {
+    els.labStatus.textContent = text;
+  }
+
+  function renderAbcde() {
+    state.abcdeResult = F.abcdeScore(state.abcdeGrades);
+    els.abcdeScore.textContent = 'Checklist score ' + Math.round(state.abcdeResult.total) + ' of 100';
+    els.abcdeBand.textContent = state.abcdeResult.band.label;
+    els.abcdeBand.setAttribute('data-band', state.abcdeResult.band.id);
+    els.abcdeNote.textContent = state.abcdeResult.note;
+  }
+
+  function renderFairnessTable(audit) {
+    const row = function (label, g) {
+      return '<tr><th scope="row">' + label + '</th><td class="num">' + g.n + '</td>' +
+        '<td class="num">' + g.sensitivity.toFixed(2) + '</td>' +
+        '<td class="num">' + g.wilson.lo.toFixed(2) + ' to ' + g.wilson.hi.toFixed(2) + '</td>' +
+        '<td class="num">' + g.specificity.toFixed(2) + '</td>' +
+        '<td class="num">' + g.fnr.toFixed(2) + '</td></tr>';
+    };
+    const body = audit.perType
+      .map(function (t) {
+        return row(t.numeral, t);
+      })
+      .concat([
+        row('I-II', audit.groups.light),
+        row('V-VI', audit.groups.deep)
+      ])
+      .join('');
+    return '<table class="data-table"><caption>Sensitivity, Wilson 95% interval, specificity and false negative rate by Fitzpatrick type at threshold ' +
+      audit.threshold.toFixed(2) + '</caption><thead><tr><th scope="col">Type</th><th scope="col">n</th>' +
+      '<th scope="col">Sens</th><th scope="col">Wilson 95%</th><th scope="col">Spec</th><th scope="col">FNR</th></tr></thead>' +
+      '<tbody>' + body + '</tbody></table>';
+  }
+
+  function renderFairness() {
+    if (!state.cohort) state.cohort = F.buildSyntheticCohort();
+    state.audit = F.auditFairness(state.cohort, state.threshold / 100);
+    els.fairChartHost.innerHTML = F.renderFairnessSvg(state.audit);
+    els.fairTableHost.innerHTML = renderFairnessTable(state.audit);
+    els.fairNote.textContent =
+      'Sensitivity gap, I-II minus V-VI: ' + state.audit.sensGap.toFixed(2) +
+      '. FNR gap, V-VI minus I-II: ' + state.audit.fnrGap.toFixed(2) +
+      '. ECE ' + state.audit.ece.toFixed(3) + ' over ' + state.audit.n + ' synthetic records.';
+  }
+
+  function renderPhotoGate() {
+    const q = state.quality;
+    els.pqList.innerHTML = q.checks
+      .map(function (c) {
+        return '<li class="pq-check" data-pass="' + (c.pass ? 'true' : 'false') + '">' +
+          '<span class="pq-name">' + R.esc(c.name) + (c.attested ? ' <span class="pq-attested">you confirmed</span>' : '') + '</span>' +
+          '<span class="pq-value">' + R.esc(c.value) + '</span>' +
+          '<span class="pq-state">' + (c.pass ? 'pass' : 'check') + '</span></li>';
+      })
+      .join('');
+    els.pqVerdict.textContent = q.verdict.text + ' ' + q.note;
+    els.pqVerdict.setAttribute('data-verdict', q.verdict.id);
+  }
+
+  function runPhotoGate() {
+    if (!state.image) {
+      els.pqVerdict.textContent = 'No image in the studio yet.';
+      return;
+    }
+    state.quality = F.imageQualityGate(state.image, { scaleConfirmed: state.scaleConfirmed });
+    renderPhotoGate();
+    renderChecksum();
+    labSay('Photo gate: ' + state.quality.passed + ' of ' + state.quality.total + ' checks pass.');
+  }
+
+  function renderPrep() {
+    const brief = F.visitPrepBrief(state.abcdeResult);
+    els.prepUrgency.textContent = brief.urgency.label;
+    els.prepUrgency.setAttribute('data-tier', brief.urgency.id);
+    els.prepNote.textContent = brief.urgency.note;
+    els.prepList.innerHTML = brief.items
+      .map(function (item) {
+        return '<li>' + R.esc(item) + '</li>';
+      })
+      .join('');
+  }
+
+  function buildExport() {
+    return F.buildAuditBundle({
+      created: new Date().toISOString(),
+      abcde: state.abcdeResult,
+      audit: state.audit,
+      quality: state.quality,
+      tone: state.analysis
+        ? {
+            lab: state.analysis.lab,
+            ita: state.analysis.ita,
+            band: state.analysis.category.name,
+            undertone: state.analysis.undertone
+          }
+        : null
+    });
+  }
+
+  function renderChecksum() {
+    state.exportBundle = buildExport();
+    els.exChecksum.textContent = 'sha256 ' + state.exportBundle.sha256;
+  }
+
+  function updateBookmark() {
+    const hash = F.formatDermHash({
+      a: state.abcdeGrades.A,
+      b: state.abcdeGrades.B,
+      c: state.abcdeGrades.C,
+      d: state.abcdeGrades.D,
+      e: state.abcdeGrades.E,
+      threshold: state.threshold,
+      scale: state.scaleConfirmed
+    });
+    let base = 'https://aariv.me/dermavto/';
+    if (typeof window.location === 'object' && window.location && typeof window.location.href === 'string') {
+      base = window.location.href.split('#')[0];
+    }
+    els.dermBookmark.value = base + '#' + hash;
+    if (window.history && typeof window.history.replaceState === 'function') {
+      try {
+        window.history.replaceState(null, '', '#' + hash);
+      } catch (err) {
+        // file:// pages can refuse replaceState; the field still shows the link.
+      }
+    }
+  }
+
+  function restoreFromHash() {
+    let raw = '';
+    try {
+      if (typeof window.location === 'object' && window.location && window.location.hash) {
+        raw = window.location.hash;
+      }
+    } catch (err) {
+      raw = '';
+    }
+    const parsed = F.parseDermHash(raw);
+    if (!parsed) return false;
+    state.abcdeGrades = { A: parsed.a, B: parsed.b, C: parsed.c, D: parsed.d, E: parsed.e };
+    state.threshold = parsed.threshold;
+    state.scaleConfirmed = parsed.scale;
+    ['A', 'B', 'C', 'D', 'E'].forEach(function (letter) {
+      const want = String(state.abcdeGrades[letter]);
+      document.querySelectorAll('input[name="abcde-' + letter + '"]').forEach(function (input) {
+        input.checked = input.value === want;
+      });
+    });
+    els.fairThreshold.value = String(state.threshold);
+    els.fairThresholdOut.textContent = String(state.threshold);
+    els.pqScale.checked = state.scaleConfirmed;
+    return true;
+  }
+
+  function renderLabAll() {
+    renderAbcde();
+    renderFairness();
+    renderPrep();
+    renderChecksum();
+    updateBookmark();
+  }
+
+  function onLabInput() {
+    renderAbcde();
+    renderPrep();
+    renderChecksum();
+    updateBookmark();
+  }
+
+  function bindLab() {
+    ['A', 'B', 'C', 'D', 'E'].forEach(function (letter) {
+      document.querySelectorAll('input[name="abcde-' + letter + '"]').forEach(function (input) {
+        input.addEventListener('change', function () {
+          if (!input.checked) return;
+          state.abcdeGrades[letter] = Number(input.value);
+          onLabInput();
+        });
+      });
+    });
+    els.fairThreshold.addEventListener('input', function () {
+      state.threshold = Number(els.fairThreshold.value);
+      els.fairThresholdOut.textContent = String(state.threshold);
+      renderFairness();
+      renderChecksum();
+      updateBookmark();
+    });
+    els.pqScale.addEventListener('change', function () {
+      state.scaleConfirmed = els.pqScale.checked === true;
+      updateBookmark();
+      renderChecksum();
+      if (state.quality) runPhotoGate();
+    });
+    els.pqRun.addEventListener('click', runPhotoGate);
+    els.exCopyJson.addEventListener('click', function () {
+      copyText(F.exportAuditJson(state.exportBundle), els.exCopyJson, els.exCopyNote);
+    });
+    els.exCopyCsv.addEventListener('click', function () {
+      copyText(F.exportAuditCsv(state.exportBundle), els.exCopyCsv, els.exCopyNote);
+    });
+    els.exCopyMd.addEventListener('click', function () {
+      copyText(F.exportAuditMarkdown(state.exportBundle), els.exCopyMd, els.exCopyNote);
+    });
+    els.exDownload.addEventListener('click', function () {
+      if (typeof Blob !== 'function' || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+        flash(els.exDownload, els.exCopyNote, 'Download is not available here; use Copy JSON instead.', false);
+        return;
+      }
+      const blob = new Blob([F.exportAuditJson(state.exportBundle)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'dermavto-workbench.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      flash(els.exDownload, els.exCopyNote, 'Downloaded dermavto-workbench.json.', true);
+    });
+    els.exVerifyRun.addEventListener('click', function () {
+      const text = els.exVerify.value;
+      if (!text || !text.trim()) {
+        els.exVerifyStatus.textContent = 'Paste a JSON export first.';
+        els.exVerifyStatus.setAttribute('data-error', 'true');
+        return;
+      }
+      const r = F.verifyAuditJson(text);
+      if (r.ok) {
+        els.exVerifyStatus.textContent = 'Digest matches. The export is unchanged.';
+        els.exVerifyStatus.setAttribute('data-error', 'false');
+      } else if (r.reason === 'changed') {
+        els.exVerifyStatus.textContent = 'Digest mismatch. The export text was changed after it was written, or the digest does not belong to it.';
+        els.exVerifyStatus.setAttribute('data-error', 'true');
+      } else {
+        els.exVerifyStatus.textContent = 'That is not a readable workbench export.';
+        els.exVerifyStatus.setAttribute('data-error', 'true');
+      }
+    });
+    els.selftestRun.addEventListener('click', function () {
+      const results = F.runSelfTests();
+      els.selftestList.innerHTML = results
+        .map(function (r) {
+          return '<li class="st-row" data-ok="' + (r.ok ? 'true' : 'false') + '">' +
+            '<span class="st-name">' + R.esc(r.name) + '</span>' +
+            '<span class="st-state">' + (r.ok ? 'pass' : 'fail') + '</span>' +
+            '<span class="st-detail">' + R.esc(r.detail) + '</span></li>';
+        })
+        .join('');
+      const fails = results.filter(function (r) {
+        return !r.ok;
+      }).length;
+      labSay(fails === 0
+        ? 'All ' + results.length + ' in page checks passed.'
+        : fails + ' of ' + results.length + ' in page checks failed.');
+    });
+  }
+
+  /* ------------------------------------------------------------ */
   /* Events                                                        */
   /* ------------------------------------------------------------ */
 
@@ -822,9 +1121,12 @@
     });
     renderActionChoices('hd', defaultActions('hd'));
     bind();
+    bindLab();
     watchStageStick();
     els.stage.style.setProperty('--split', els.split.value + '%');
     loadPreset(radioValue('preset', 'p3'));
+    restoreFromHash();
+    renderLabAll();
   }
 
   init();

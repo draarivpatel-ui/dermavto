@@ -10,6 +10,7 @@ const ROOT = path.join(__dirname, '..');
 const E = require('../engine.js');
 const R = require('../render.js');
 const Y = require('../youcam-live.js');
+const F = require('../fairness-lab.js');
 
 const DASHES = new RegExp('[' + String.fromCharCode(0x2013) + String.fromCharCode(0x2014) + ']');
 const DASH_ENTITIES = new RegExp('&(m|n)dash;|&#(8212|8211|x2014|x2013);', 'i');
@@ -435,7 +436,7 @@ function buildDocument() {
     c.dataset.chip = m[1];
     return c;
   });
-  const defaults = { coverage: '60', glow: '10', 'lip-intensity': '85', 'lip-finish': 'satin', 'yc-src': 'https://example.com/selfie.jpg', 'yc-src-type': 'src_file_url', split: '50' };
+  const defaults = { coverage: '60', glow: '10', 'lip-intensity': '85', 'lip-finish': 'satin', 'yc-src': 'https://example.com/selfie.jpg', 'yc-src-type': 'src_file_url', split: '50', 'fair-threshold': '65' };
   Object.keys(defaults).forEach((k) => {
     byId[k].value = defaults[k];
   });
@@ -477,6 +478,7 @@ describe('app.js on a stand-in DOM', () => {
       DermaVTO: E,
       DermaRender: R,
       DermaYouCam: Y,
+      DermaFairness: F,
       fetch: (...args) => currentFetch(...args),
       ImageData: class ImageData {
         constructor(data, width, height) {
@@ -776,7 +778,7 @@ describe('app.js on a stand-in DOM', () => {
   });
 
   it('makes no network calls outside youcam-live.js', () => {
-    ['app.js', 'engine.js', 'render.js'].forEach((name) => {
+    ['app.js', 'engine.js', 'render.js', 'fairness-lab.js'].forEach((name) => {
       assert.doesNotMatch(read(name), /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|navigator\.geolocation|new Image\(\)\.src/, name);
     });
     const live = read('youcam-live.js');
@@ -790,5 +792,83 @@ describe('app.js on a stand-in DOM', () => {
     assert.equal(dom.byId['yc-key'].attrs.value, undefined);
     assert.ok(!html.includes('autocomplete="on"'));
     assert.match(html, /id="yc-key" type="password" autocomplete="off"/);
+  });
+
+  it('renders the lab on load: score, chart, prep and bookmark', () => {
+    assert.match(dom.byId['abcde-score'].textContent, /^Checklist score 0 of 100$/);
+    assert.equal(dom.byId['abcde-band'].textContent, 'Few checklist signs');
+    assert.match(dom.byId['fair-chart-host'].innerHTML, /^<svg class="fair-svg"/);
+    assert.match(dom.byId['fair-table-host'].innerHTML, /<caption>Sensitivity, Wilson 95%/);
+    assert.match(dom.byId['fair-note'].textContent, /Sensitivity gap, I-II minus V-VI: 0\.\d+/);
+    assert.match(dom.byId['fair-note'].textContent, /ECE 0\.\d+ over 360 synthetic records/);
+    assert.match(dom.byId['derm-bookmark'].value, /#derm=v1,a0,b0,c0,d0,e0,t65,s0$/);
+    assert.match(dom.byId['ex-checksum'].textContent, /^sha256 [0-9a-f]{64}$/);
+    assert.equal(dom.byId['prep-urgency'].textContent, 'Keep monthly self checks');
+    assert.ok(dom.byId['prep-list'].innerHTML.length > 50);
+  });
+
+  it('rescoring the checklist updates band, urgency and the bookmark', () => {
+    pick('abcde-E', '2');
+    assert.equal(dom.byId['prep-urgency'].textContent, 'Book a dermatology visit');
+    assert.match(dom.byId['derm-bookmark'].value, /e2/);
+    ['A', 'B', 'C', 'D', 'E'].forEach((l) => pick('abcde-' + l, '3'));
+    assert.equal(dom.byId['prep-urgency'].textContent, 'Seek a prompt dermatology review');
+    assert.equal(dom.byId['abcde-band'].textContent, 'Strong checklist pattern');
+    assert.match(dom.byId['derm-bookmark'].value, /#derm=v1,a3,b3,c3,d3,e3,t65,s0$/);
+    ['A', 'B', 'C', 'D', 'E'].forEach((l) => pick('abcde-' + l, '0'));
+  });
+
+  it('reaudits when the fairness threshold moves', () => {
+    const before = dom.byId['fair-note'].textContent;
+    dom.byId['fair-threshold'].value = '90';
+    dom.byId['fair-threshold'].fire('input');
+    assert.equal(dom.byId['fair-threshold-out'].textContent, '90');
+    const after = dom.byId['fair-note'].textContent;
+    assert.notEqual(after, before);
+    assert.match(after, /I-II minus V-VI: 0\.\d+/);
+    dom.byId['fair-threshold'].value = '65';
+    dom.byId['fair-threshold'].fire('input');
+  });
+
+  it('runs the photo gate on the studio image', () => {
+    dom.byId['pq-scale'].checked = false;
+    dom.byId['pq-scale'].fire('change');
+    dom.byId['pq-run'].click();
+    const rows = dom.byId['pq-list'].innerHTML;
+    assert.equal((rows.match(/pq-check/g) || []).length, 5);
+    assert.match(dom.byId['pq-verdict'].textContent, /Retake the photo/);
+    assert.match(rows, /scale \(add a ruler or coin\)|Scale reference in frame/);
+    dom.byId['pq-scale'].checked = true;
+    dom.byId['pq-scale'].fire('change');
+    assert.match(dom.byId['pq-verdict'].textContent, /Ready to send/);
+    assert.match(dom.byId['derm-bookmark'].value, /s1$/);
+    dom.byId['pq-scale'].checked = false;
+    dom.byId['pq-scale'].fire('change');
+  });
+
+  it('copies the JSON export and verifies it, then flags a tamper', () => {
+    clipboard.length = 0;
+    dom.byId['ex-copy-json'].click();
+    assert.equal(clipboard.length, 1);
+    const exported = clipboard[0];
+    assert.match(exported, /dermavto-workbench-export/);
+    assert.match(exported, /"sha256": "[0-9a-f]{64}"/);
+    dom.byId['ex-verify'].value = exported;
+    dom.byId['ex-verify-run'].click();
+    assert.match(dom.byId['ex-verify-status'].textContent, /Digest matches/);
+    const doc = JSON.parse(exported);
+    doc.payload.abcde.score = 99;
+    dom.byId['ex-verify'].value = JSON.stringify(doc);
+    dom.byId['ex-verify-run'].click();
+    assert.match(dom.byId['ex-verify-status'].textContent, /Digest mismatch/);
+  });
+
+  it('runs the in page self tests and reports all pass', () => {
+    dom.byId['selftest-run'].click();
+    const rows = dom.byId['selftest-list'].innerHTML;
+    const total = (rows.match(/st-row/g) || []).length;
+    assert.ok(total >= 15, total + ' self test rows');
+    assert.equal(rows.includes('data-ok="false"'), false);
+    assert.match(dom.byId['lab-status'].textContent, /All \d+ in page checks passed/);
   });
 });

@@ -43,6 +43,7 @@
         <li><a href="#reading">Reading</a></li>
         <li><a href="#shades">Shades</a></li>
         <li><a href="#youcam">YouCam</a></li>
+        <li><a href="#lab">Lab</a></li>
         <li><a href="#method">Method</a></li>
       </ul>
     </nav>
@@ -317,6 +318,150 @@
       </div>
     </section>
 
+    <section class="band" id="lab" aria-labelledby="lab-title">
+      <div class="band-head">
+        <h2 id="lab-title">Screening literacy and fairness workbench</h2>
+        <p>An ABCDE checklist for deciding when to book a dermatologist, a fairness audit of one referral threshold across Fitzpatrick types I to VI on disclosed synthetic records, and a photo readiness gate for a telederm visit. Educational only, never a medical judgement.</p>
+      </div>
+
+      <div class="lab-grid">
+        <div class="panel" id="abcde-panel" aria-labelledby="abcde-title">
+          <h3 id="abcde-title">ABCDE checklist</h3>
+          <p class="hint">The ABCDE checklist comes from public skin cancer education: Asymmetry, Border, Colour, Diameter at or over 6 mm, and Evolution, which is the warning sign that weighs most. It helps you decide when to book a visit. It cannot sort a harmless spot from a harmful one, and a low score rules nothing out. A spot that worries you is reason enough to book.</p>
+          <div class="abcde-grid">
+            <fieldset class="abcde-card">
+              <legend><span class="abcde-letter">A</span> Asymmetry</legend>
+              <div class="abcde-opts" role="radiogroup" aria-label="Asymmetry">
+                <label><input type="radio" name="abcde-A" value="0" checked><span>Both halves look alike</span></label>
+                <label><input type="radio" name="abcde-A" value="1"><span>A little uneven</span></label>
+                <label><input type="radio" name="abcde-A" value="2"><span>Clearly lopsided</span></label>
+                <label><input type="radio" name="abcde-A" value="3"><span>Very uneven or one half much darker</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="abcde-card">
+              <legend><span class="abcde-letter">B</span> Border</legend>
+              <div class="abcde-opts" role="radiogroup" aria-label="Border">
+                <label><input type="radio" name="abcde-B" value="0" checked><span>Edge is smooth and even</span></label>
+                <label><input type="radio" name="abcde-B" value="1"><span>A little uneven</span></label>
+                <label><input type="radio" name="abcde-B" value="2"><span>Notched, scalloped or blurred</span></label>
+                <label><input type="radio" name="abcde-B" value="3"><span>Ragged, blurred or spreading</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="abcde-card">
+              <legend><span class="abcde-letter">C</span> Colour</legend>
+              <div class="abcde-opts" role="radiogroup" aria-label="Colour">
+                <label><input type="radio" name="abcde-C" value="0" checked><span>One even colour</span></label>
+                <label><input type="radio" name="abcde-C" value="1"><span>Two shades</span></label>
+                <label><input type="radio" name="abcde-C" value="2"><span>Three or more colours</span></label>
+                <label><input type="radio" name="abcde-C" value="3"><span>Many colours, or black, blue or red areas</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="abcde-card">
+              <legend><span class="abcde-letter">D</span> Diameter</legend>
+              <div class="abcde-opts" role="radiogroup" aria-label="Diameter">
+                <label><input type="radio" name="abcde-D" value="0" checked><span>Under 6 mm across</span></label>
+                <label><input type="radio" name="abcde-D" value="1"><span>About 6 mm across</span></label>
+                <label><input type="radio" name="abcde-D" value="2"><span>Clearly over 6 mm</span></label>
+                <label><input type="radio" name="abcde-D" value="3"><span>Well over 6 mm or still growing</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="abcde-card">
+              <legend><span class="abcde-letter">E</span> Evolution</legend>
+              <div class="abcde-opts" role="radiogroup" aria-label="Evolution">
+                <label><input type="radio" name="abcde-E" value="0" checked><span>No change over months</span></label>
+                <label><input type="radio" name="abcde-E" value="1"><span>Slow change over months</span></label>
+                <label><input type="radio" name="abcde-E" value="2"><span>Fast change in size, shape or colour</span></label>
+                <label><input type="radio" name="abcde-E" value="3"><span>Bleeds, itches, crusts or hurts</span></label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="abcde-readout">
+            <p class="mono-line" id="abcde-score">Checklist score 0 of 100</p>
+            <p class="tag-row"><span class="band-tag" id="abcde-band">Few checklist signs</span></p>
+            <p class="hint" id="abcde-note"></p>
+          </div>
+        </div>
+
+        <div class="panel" aria-labelledby="fair-title">
+          <h3 id="fair-title">Fitzpatrick I to VI fairness audit</h3>
+          <p class="hint">Synthetic records, sixty per Fitzpatrick type, generated in this tab from a fixed seed. The planted assessor is deliberately weaker on types V and VI to model a fairness concern published about visual lesion checklists. Move the threshold to watch the audit change. This demonstrates the audit method; it is not a clinical study and says nothing about any real product.</p>
+          <div class="field">
+            <label for="fair-threshold">Referral threshold <output id="fair-threshold-out" for="fair-threshold">65</output></label>
+            <input id="fair-threshold" type="range" min="5" max="95" value="65">
+            <p class="hint">A record scoring at or above the threshold counts as flagged for referral.</p>
+          </div>
+          <figure class="plot-card">
+            <div id="fair-chart-host"></div>
+            <figcaption>Bars show sensitivity per type with Wilson 95% intervals. Sage lines are the pooled sensitivities for types I-II and V-VI, with the gap bracket at right. The lower panel plots observed positive share against mean score per bin; a well calibrated generator hugs the dashed line.</figcaption>
+          </figure>
+          <div id="fair-table-host"></div>
+          <p class="mono-line" id="fair-note"></p>
+        </div>
+
+        <div class="panel" aria-labelledby="pq-title">
+          <h3 id="pq-title">Photo readiness gate</h3>
+          <p class="hint">Runs on the image now in the studio, whether specimen or photo. It checks pixel count, even light, a sharpness proxy and how much of the frame is skin coloured. It judges the photo, never what the photo shows.</p>
+          <div class="field field-check">
+            <label class="check-line" for="pq-scale"><input id="pq-scale" type="checkbox"><span>A ruler, tape measure or coin sits in the frame beside the spot.</span></label>
+            <p class="hint" id="pq-scale-help">A reference object cannot be verified from pixels, so the gate records your confirmation.</p>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn" id="pq-run">Check this photo</button>
+          </div>
+          <ol class="pq-list" id="pq-list"></ol>
+          <p class="hint" id="pq-verdict" role="status" aria-live="polite">Press Check this photo to run the gate on the studio image.</p>
+        </div>
+
+        <div class="panel" aria-labelledby="prep-title">
+          <h3 id="prep-title">Referral and visit prep</h3>
+          <p class="tag-row"><span class="band-tag" id="prep-urgency">Keep monthly self checks</span></p>
+          <p class="hint" id="prep-note"></p>
+          <ol class="prep-list" id="prep-list"></ol>
+          <p class="hint">What to bring a board certified dermatologist. The urgency tag follows the checklist answers above; it is triage guidance, not a judgement of what the spot is.</p>
+        </div>
+      </div>
+
+      <div class="panel panel-export" id="export-panel" aria-labelledby="export-title">
+        <h3 id="export-title">Audit export, bookmark and self tests</h3>
+        <div class="export-grid">
+          <div class="field">
+            <span class="field-label">Export the workbench state</span>
+            <div class="btn-row">
+              <button type="button" class="btn" id="ex-copy-json">Copy JSON</button>
+              <button type="button" class="btn btn-quiet" id="ex-copy-csv">Copy CSV</button>
+              <button type="button" class="btn btn-quiet" id="ex-copy-md">Copy Markdown</button>
+              <button type="button" class="btn btn-quiet" id="ex-download">Download JSON</button>
+            </div>
+            <p class="hint">The digest is an unkeyed SHA-256 tamper check over the report payload. It shows whether the file changed after export. It is not a signature and proves nothing about who wrote it.</p>
+            <p class="mono-line" id="ex-checksum"></p>
+            <p class="hint" id="ex-copy-note" role="status" aria-live="polite"></p>
+          </div>
+          <div class="field">
+            <label for="derm-bookmark">Bookmark this workbench state</label>
+            <input id="derm-bookmark" type="text" readonly value="#derm=v1,a0,b0,c0,d0,e0,t65,s0" aria-describedby="derm-bookmark-help">
+            <p class="hint" id="derm-bookmark-help">Opening this link restores the checklist answers, the threshold and the scale confirmation. It updates as you answer and nothing is stored anywhere.</p>
+          </div>
+          <div class="field">
+            <label for="ex-verify">Verify an export</label>
+            <textarea id="ex-verify" rows="6" spellcheck="false" aria-describedby="ex-verify-help"></textarea>
+            <p class="hint" id="ex-verify-help">Paste a JSON export to recompute its digest and compare.</p>
+            <div class="btn-row">
+              <button type="button" class="btn btn-quiet" id="ex-verify-run">Verify</button>
+            </div>
+            <p class="hint" id="ex-verify-status" role="status" aria-live="polite"></p>
+          </div>
+          <div class="field">
+            <span class="field-label">In page self tests</span>
+            <div class="btn-row">
+              <button type="button" class="btn" id="selftest-run">Run self tests</button>
+            </div>
+            <ol class="selftest-list" id="selftest-list"></ol>
+          </div>
+        </div>
+        <p class="hint" id="lab-status" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
     <section class="band band-method" id="method" aria-labelledby="method-title">
       <div class="band-head">
         <h2 id="method-title">What this measures and where it stops</h2>
@@ -359,6 +504,7 @@
   <script src="engine.js"></script>
   <script src="render.js"></script>
   <script src="youcam-live.js"></script>
+  <script src="fairness-lab.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

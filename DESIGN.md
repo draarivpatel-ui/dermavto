@@ -43,3 +43,11 @@ Contrast was computed from the tokens. Ink on paper is 17.0 to 1, accent on pape
 - Reduced motion removes the entrance animation and the transitions.
 - Layout checked at 320, 375, 414, 768 and 1024 pixels with no horizontal overflow.
 - No fake browser chrome and no stock imagery. The skin specimen is drawn in code and labelled as such.
+
+## The screening literacy lab
+
+The workbench reuses the existing panel, hint, band-tag and mono-line parts, and the section keeps the band head pattern of title on the left and lead on the right. ABCDE letters sit in ink circles inside real fieldset legends, and every option is a real radio inside its label.
+
+The fairness chart is one SVG computed in `fairness-lab.js` and assigned to `innerHTML`, so a redraw cannot drop event state. Sensitivity bars are ink for types I to IV and carmine accent for types V and VI, with Wilson 95% intervals as whiskers. The pooled I-II and V-VI sensitivities are sage rules and the gap reads off a bracket at the right. A lower panel plots observed positive share against mean score per bin beside a dashed diagonal. Type names are Plus Jakarta Sans and the numeric labels are JetBrains Mono, both enlarged at small widths.
+
+Self test rows list the check name, a detail line in muted text and a pass or fail tag, all inside the existing tag styles.

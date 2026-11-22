@@ -17,6 +17,16 @@ Everything in `engine.js` follows the live paths. The function names from the br
 
 The Devpost page says all solutions must integrate at least one YouCam API into a functional prototype, and one judging criterion is how thoroughly the project integrates it. A page that only builds payloads would not satisfy that, so `youcam-live.js` runs the real flow from the browser when someone supplies their own key. Read from the Devpost page on 25 October 2026. The page also asks for a 1 to 3 minute demo video that explains the YouCam API used and shows the project working, screenshots, and a public repository.
 
+## Screening literacy workbench, added 22 November 2026
+
+`fairness-lab.js` is a UMD module with no DOM and no network, in the style of `render.js`. The ABCDE checklist weights Asymmetry, Border and Colour 1 each, Diameter 1.25 and Evolution 2, scaled to 100. Evolution carries the most weight because public guidance treats change over time as the strongest reason to be seen. The urgency tag follows the total and the Evolution grade, with a prompt review at a total of 70 or more or an Evolution grade of 3. None of it reads a photo.
+
+The fairness audit generates 360 synthetic records, 60 per Fitzpatrick type with exactly the same positive share in each, from a fixed seed so the table and chart are identical on every load. The planted assessor is deliberately weaker on types V and VI (separation steps down from 0.62 on type I to 0.30 on type VI), which reproduces the direction of the published concern that visual lesion aids perform worse on darker skin. The numbers demonstrate the audit method. They are not evidence about any real product.
+
+The SHA-256 in `fairness-lab.js` is a from scratch FIPS 180-4 implementation. It passes the four published known answer vectors and agrees with Node crypto on the padding boundary lengths 55, 56, 63, 64 and 119 and on one million `a` characters. It is unkeyed, so the export digest detects a changed file but cannot stop a deliberate rewrite and cannot say who wrote it.
+
+The photo gate reads only the pixels of whatever sits in the studio. Its checks are minimum side length, mean and spread of CIE L*, a Laplacian sharpness proxy and the share of the frame that reads as skin coloured. The scale reference item is a checkbox the user confirms. It cannot be measured from pixels.
+
 ## Verified, and how
 
 | Claim | How it was checked |
@@ -28,6 +38,9 @@ The Devpost page says all solutions must integrate at least one YouCam API into 
 | CORS | A preflight `OPTIONS` request with `Origin`, `Access-Control-Request-Method` and `Access-Control-Request-Headers` set was answered with `access-control-allow-origin: *` and `authorization, content-type` allowed. |
 | Invalid key response | `POST` with the key `INVALID_TEST_KEY` returned HTTP 401 `{"error_code":"InvalidApiKey"}`, and the page in a real browser shows the friendly message. No real key was used or exists in this repository. |
 | Layout | Headless Chrome at 320, 375, 414, 768 and 1024 wide. No horizontal overflow, and no two line buttons or nav links. |
+| Workbench layout | Real headless Chrome 22 November 2026 at 1440x900 and 390x844. Zero console errors, page errors, external requests, failed requests and horizontal overflow. The fairness SVG renders at both widths. |
+| In page self tests | All 17 pass in real headless Chrome, including the four SHA-256 known answer vectors, Wilson interval ordering, ECE bounds, cohort partition conservation, CSV escaping and export tamper detection. |
+| Bookmark round trip | A `#derm=` hash was loaded in real headless Chrome and restored the checklist answers, the threshold and the scale confirmation. |
 
 ## Not verified
 
@@ -36,6 +49,9 @@ The Devpost page says all solutions must integrate at least one YouCam API into 
 - Lip shape names other than `original`. The documentation points to a `lipshape.json` that was not available.
 - The ITA band names are the commonly tabulated ones. Only the review's lowercase list was seen.
 - Fonts were fetched from Google Fonts once and are committed. They were not compared byte for byte with the upstream release.
+- The fairness cohort is synthetic and planted. Whether its gap magnitudes resemble any real product is unknown, and the page says so.
+- The photo gate thresholds were tuned on the procedural specimen and a small set of test frames. They have not been checked against real telederm submissions.
+- The bookmark codec was checked in headless Chrome on this machine, not across browsers.
 
 ## Heuristics that must stay labelled
 
@@ -44,6 +60,9 @@ The Devpost page says all solutions must integrate at least one YouCam API into 
 - Lip target is the sample with L* minus 14, a* plus 22 and b* minus 2.
 - The erythema and melanin numbers are three channel proxies. The erythema proxy rises with deeper tone, which is why redness coverage is reported as well.
 - Local scores map only to pores, texture, oiliness and redness. Wrinkle, blemish, moisture and radiance are marked as needing the API, because a flat patch cannot say anything honest about them. Radiance in particular would have scored dark skin lower by construction.
+- ABCDE letter weights 1, 1, 1, 1.25 and 2, the band edges at 20, 45 and 70, and the urgency thresholds are judgement calls on published education material, not measured values.
+- Photo gate thresholds are a 480 pixel minimum side, L* mean 18 to 92, L* spread 2 to 32, Laplacian spread 0.7 and skin share 0.2.
+- The planted separation schedule in the synthetic cohort, 0.62 down to 0.30 by type, is tuned so the default threshold shows a visible gap. It is a teaching device, not a fitted model.
 
 ## Design record
 
