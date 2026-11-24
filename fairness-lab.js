@@ -401,7 +401,7 @@
    * and the caller can check wilson.n.
    */
   function wilsonInterval(k, n, z) {
-    const zz = z === undefined ? 1.959963984540054 : z;
+    const zz = Number.isFinite(z) && z > 0 ? z : 1.959963984540054;
     if (!Number.isFinite(k) || !Number.isFinite(n) || n <= 0) {
       return { p: 0, lo: 0, hi: 1, k: 0, n: 0 };
     }
@@ -508,9 +508,9 @@
     records.forEach(function (r) {
       if (
         !r || !Number.isInteger(r.type) || r.type < 1 || r.type > 6 ||
-        (r.truth !== 0 && r.truth !== 1) || !Number.isFinite(r.score)
+        (r.truth !== 0 && r.truth !== 1) || !Number.isFinite(r.score) || r.score < 0 || r.score > 1
       ) {
-        throw new TypeError('each record needs type 1..6, truth 0 or 1 and a finite score');
+        throw new TypeError('each record needs type 1..6, truth 0 or 1 and a score from 0 to 1');
       }
     });
   }
@@ -695,7 +695,7 @@
       {
         id: 'scale',
         name: 'Scale reference in frame',
-        value: o.scaleConfirmed ? 'confirmed by you' : 'not confirmed',
+        value: o.scaleConfirmed === true ? 'confirmed by you' : 'not confirmed',
         target: 'a ruler, tape or coin beside the spot',
         pass: o.scaleConfirmed === true,
         attested: true
@@ -732,18 +732,25 @@
   /* ------------------------------------------------------------------ */
 
   /** Deterministic JSON with sorted keys, used as the digest input. */
-  function canonicalJson(v) {
+  function canonicalJson(v, seen) {
     if (v === null || typeof v !== 'object') {
       const s = JSON.stringify(v === undefined ? null : v);
       return s === undefined ? 'null' : s;
     }
+    const stack = seen || [];
+    if (stack.indexOf(v) !== -1) throw new TypeError('cyclic structure cannot be canonicalized');
+    stack.push(v);
+    let out;
     if (Array.isArray(v)) {
-      return '[' + v.map(canonicalJson).join(',') + ']';
+      out = '[' + v.map(function (x) { return canonicalJson(x, stack); }).join(',') + ']';
+    } else {
+      const keys = Object.keys(v).sort();
+      out = '{' + keys.map(function (k) {
+        return JSON.stringify(k) + ':' + canonicalJson(v[k], stack);
+      }).join(',') + '}';
     }
-    const keys = Object.keys(v).sort();
-    return '{' + keys.map(function (k) {
-      return JSON.stringify(k) + ':' + canonicalJson(v[k]);
-    }).join(',') + '}';
+    stack.pop();
+    return out;
   }
 
   const EXPORT_NOTE =

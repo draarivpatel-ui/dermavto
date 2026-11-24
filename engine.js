@@ -134,7 +134,9 @@
 
   function rgbToHex(r, g, b) {
     const part = function (v) {
-      return Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0');
+      const n = Number(v);
+      const x = Number.isFinite(n) ? n : n === Infinity ? 255 : 0;
+      return Math.round(clamp(x, 0, 255)).toString(16).padStart(2, '0');
     };
     return '#' + part(r) + part(g) + part(b);
   }

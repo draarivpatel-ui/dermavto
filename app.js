@@ -1024,7 +1024,10 @@
     els.sampleToggle.addEventListener('click', function () {
       state.sampling = !state.sampling;
       syncSamplingUi();
-      if (state.sampling) say('Picker on. Click the image, or use the arrow keys, to move the sampled patch.');
+      if (state.sampling) {
+        els.picker.focus();
+        say('Picker on. Click the image, or use the arrow keys, to move the sampled patch.');
+      }
     });
     let dragging = false;
     els.picker.addEventListener('pointerdown', function (event) {

@@ -390,6 +390,9 @@ class El {
   click() {
     this.fire('click');
   }
+  focus() {
+    this.focused = true;
+  }
   setAttribute(k, v) {
     this.attrs[k] = String(v);
   }
@@ -668,6 +671,7 @@ describe('app.js on a stand-in DOM', () => {
     dom.byId['sample-toggle'].click();
     assert.equal(dom.byId['sample-toggle'].attrs['aria-pressed'], 'true');
     assert.equal(dom.byId['stage-picker'].hidden, false);
+    assert.equal(dom.byId['stage-picker'].focused, true);
     const before = dom.byId['stage-ring'].style.left;
     dom.byId['stage-picker'].fire('keydown', { key: 'ArrowLeft' });
     assert.notEqual(dom.byId['stage-ring'].style.left, before);
