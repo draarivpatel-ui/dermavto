@@ -1910,6 +1910,14 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
     display: block;
   }
 
+  #youcam .code.receipt {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line-strong);
+    max-height: none;
+    overflow: visible;
+  }
+
   .plot-card,
   .metrics,
   .ranking li,
