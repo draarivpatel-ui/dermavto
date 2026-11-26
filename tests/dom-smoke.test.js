@@ -259,6 +259,29 @@ describe('Style rules', () => {
   it('opens styles.css with the Hallmark stamp', () => {
     assert.match(css.split('\n')[0], /^\/\* Hallmark \| macrostructure: Workbench/);
   });
+
+  it('keeps controls and tooling off the printed page', () => {
+    const block = css.match(/@media print \{([\s\S]*?)\n\}/);
+    assert.ok(block, 'missing @media print block');
+    ['button', '.btn-row', '.segmented', '#yc-form', '#yc-live', '#export-panel', '#youcam .panel-code'].forEach((sel) => {
+      assert.ok(block[1].includes(sel), `print CSS does not hide ${sel}`);
+    });
+    assert.match(block[1], /break-inside:\s*avoid/);
+    assert.match(block[1], /break-after:\s*avoid/);
+  });
+
+  it('keeps buttons and sliders at the 44px touch floor', () => {
+    assert.match(css, /\.btn\s*\{[^}]*min-height:\s*44px/);
+    assert.match(css, /input\[type="range"\]:not\(\.stage-range\)\s*\{[^}]*height:\s*44px/);
+    assert.match(css, /\.check-grid label\s*\{[^}]*min-height:\s*24px/);
+    assert.match(css, /\.abcde-opts label\s*\{[^}]*min-height:\s*24px/);
+  });
+
+  it('tightens the nav so six links fit on one phone line', () => {
+    const block = css.match(/@media \(max-width: 560px\) \{([\s\S]*?)\n\}/);
+    assert.ok(block, 'missing 560px breakpoint');
+    assert.match(block[1], /\.nav-list\s*\{\s*gap:\s*var\(--space-1\) var\(--space-2\);/);
+  });
 });
 
 describe('render.js output', () => {

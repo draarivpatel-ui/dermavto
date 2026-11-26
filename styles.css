@@ -320,7 +320,7 @@ textarea {
 
 input[type="range"]:not(.stage-range) {
   width: 100%;
-  height: 28px;
+  height: 44px;
   margin: 0;
   background: transparent;
   appearance: none;
@@ -375,6 +375,7 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  min-height: 44px;
   padding: var(--space-3) var(--space-5);
   border: var(--rule-hair) solid var(--color-ink);
   border-radius: var(--radius-sm);
@@ -1141,6 +1142,7 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
+  min-height: 24px;
   font-size: var(--text-sm);
   font-weight: 400;
 }
@@ -1176,6 +1178,7 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: 24px;
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
@@ -1382,8 +1385,9 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
 
 .abcde-opts label {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
+  min-height: 24px;
   font-size: var(--text-sm);
   font-weight: 400;
 }
@@ -1750,6 +1754,10 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
 }
 
 @media (max-width: 560px) {
+  .nav-list {
+    gap: var(--space-1) var(--space-2);
+  }
+
   .arc-tick,
   .arc-axis {
     font-size: 19px;
@@ -1862,10 +1870,67 @@ input[type="range"]:not(.stage-range):active::-webkit-slider-thumb {
 }
 
 @media print {
+  @page {
+    margin: 14mm;
+  }
+
   .masthead,
+  .skip-link,
   .studio-controls,
   .stage,
-  .colophon {
-    display: none;
+  .colophon,
+  button,
+  .btn,
+  .btn-row,
+  .segmented,
+  input[type="range"],
+  input[type="text"],
+  input[type="password"],
+  input[type="file"],
+  select,
+  textarea,
+  #yc-form,
+  #yc-live,
+  #export-panel,
+  #youcam .panel-code,
+  #youcam .youcam-grid-lower .panel:first-child {
+    display: none !important;
+  }
+
+  body {
+    background: var(--color-paper);
+  }
+
+  .studio {
+    display: block;
+    padding-bottom: 0;
+  }
+
+  #youcam .youcam-grid {
+    display: block;
+  }
+
+  .plot-card,
+  .metrics,
+  .ranking li,
+  .panel,
+  .receipt,
+  figure,
+  tr {
+    break-inside: avoid;
+  }
+
+  .band-head,
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
