@@ -839,7 +839,9 @@
   /** CSV cell escaping: quotes doubled, and formula-leading cells prefixed with a quote mark. */
   function csvCell(v) {
     let s = v === null || v === undefined ? '' : String(v);
-    if (/^[=+@\t ]/.test(s) || (/^-/.test(s) && !/^-\d+(\.\d+)?([eE][+-]?\d+)?$/.test(s))) {
+    const formulaLead = /^[\s\u0085\u180E\u200B\u200C\u200D\u2060\uFEFF]*[=+\-@\t\r]/.test(s);
+    const negativeNumber = /^-\d+(\.\d+)?([eE][+-]?\d+)?$/.test(s);
+    if (formulaLead && !negativeNumber) {
       s = "'" + s;
     }
     if (/[",\n\r']/.test(s) || s !== s.trim()) {

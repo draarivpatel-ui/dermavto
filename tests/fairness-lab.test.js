@@ -845,3 +845,12 @@ describe('Lab page wiring pins', () => {
     assert.equal(src.includes('sessionStorage'), false);
   });
 });
+
+describe('CSV hardening boundary regressions', function () {
+  it('neutralizes formula triggers behind whitespace and invisible Unicode', function () {
+    [' ', '\t', '\u00A0', '\u200B', '\uFEFF'].forEach(function (lead) {
+      assert.ok(F.csvCell(lead + '=cmd').indexOf("'") === 0 || F.csvCell(lead + '=cmd').indexOf("\"'") === 0, JSON.stringify(lead));
+    });
+    assert.equal(F.csvCell('-2'), '-2');
+  });
+});
